@@ -78,4 +78,4 @@ $
 
 # License
 
-See [LICENSE].
+See [LICENSE](https://github.com/cubicdaiya/ngx_dynamic_upstream/blob/master/LICENSE).
