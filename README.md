@@ -6,7 +6,7 @@ such as [`ngx_http_upstream_conf`](http://nginx.org/en/docs/http/ngx_http_upstre
 # Required
 
 `ngx_dynamic_upstream` requires the `zone` directive in the `upstream` context.
-This directive is possible to nginx-1.9.0-plus.
+This directive is available in nginx-1.9.0-plus.
 
 # Status
 
