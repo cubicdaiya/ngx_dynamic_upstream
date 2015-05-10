@@ -3,6 +3,11 @@
 `ngx_dynamic_upstream` is the module for operating upstreams dynamically with HTTP APIs
 such as [`ngx_http_upstream_conf`](http://nginx.org/en/docs/http/ngx_http_upstream_conf_module.html).
 
+# Required
+
+`ngx_dynamic_upstream` requires the `zone` directive in the `upstream` context.
+This directive is possible to nginx-1.9.0-plus.
+
 # Status
 
 This module is significantly experimental and still under early develpment phase.
