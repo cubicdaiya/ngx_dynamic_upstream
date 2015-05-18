@@ -94,7 +94,7 @@ $
 ## remove
 
 ```bash
-$ curl "http://127.0.0.1:6000/dynamic?upstream=backends&remove=&id=3"
+$ curl "http://127.0.0.1:6000/dynamic?upstream=backends&remove=&server=127.0.0.1:6003"
 127.0.0.1:6001;
 127.0.0.1:6002;
 127.0.0.1:6004;
