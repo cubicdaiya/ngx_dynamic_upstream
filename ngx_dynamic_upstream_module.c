@@ -11,22 +11,31 @@
 #define NGX_DYNAMIC_UPSTEAM_OP_BACKUP 3
 #define NGX_DYNAMIC_UPSTEAM_OP_PARAM  4
 
+#define NGX_DYNAMIC_UPSTEAM_OP_PARAM_WEIGHT       1
+#define NGX_DYNAMIC_UPSTEAM_OP_PARAM_MAX_FAILS    2
+#define NGX_DYNAMIC_UPSTEAM_OP_PARAM_FAIL_TIMEOUT 4
+#define NGX_DYNAMIC_UPSTEAM_OP_PARAM_DOWN         8
+
 typedef struct ngx_dynamic_upstream_op_t {
-    ngx_int_t  verbose;
-    ngx_int_t  op;
-    ngx_int_t  backup;
-    ngx_int_t  weight;
-    ngx_int_t  max_fails;
-    ngx_int_t  fail_timeout;
-    ngx_int_t  down;
-    ngx_str_t  upstream;
-    ngx_str_t  server;
+    ngx_int_t verbose;
+    ngx_int_t single;
+    ngx_int_t op;
+    ngx_int_t op_param;
+    ngx_int_t backup;
+    ngx_int_t weight;
+    ngx_int_t max_fails;
+    ngx_int_t fail_timeout;
+    ngx_int_t down;
+    ngx_str_t upstream;
+    ngx_str_t server;
 } ngx_dynamic_upstream_op_t;
 
 static ngx_int_t ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op,
                                              ngx_slab_pool_t *shpool, ngx_http_upstream_srv_conf_t *uscf);
 static ngx_int_t ngx_dynamic_upstream_op_remove(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op,
                                                 ngx_slab_pool_t *shpool, ngx_http_upstream_srv_conf_t *uscf);
+static ngx_int_t ngx_dynamic_upstream_op_update_param(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op,
+                                                      ngx_slab_pool_t *shpool, ngx_http_upstream_srv_conf_t *uscf);
 //static ngx_int_t ngx_dynamic_upstream_op_backup(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op, ngx_http_upstream_srv_conf_t *uscf);
 
 static ngx_http_upstream_srv_conf_t *ngx_dynamic_upstream_get_zone(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op);
@@ -158,21 +167,33 @@ ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
                 if (op->weight == NGX_ERROR) {
                     return NGX_ERROR;
                 }
+                op->op = NGX_DYNAMIC_UPSTEAM_OP_PARAM;
+                op->op_param |= NGX_DYNAMIC_UPSTEAM_OP_PARAM_WEIGHT;
+                op->verbose = 1;
 
             } else if (ngx_strncmp("arg_max_fails", args[i].data, args[i].len) == 0) {
                 op->max_fails = ngx_atoi(var->data, var->len);
                 if (op->max_fails == NGX_ERROR) {
                     return NGX_ERROR;
                 }
+                op->op = NGX_DYNAMIC_UPSTEAM_OP_PARAM;
+                op->op_param |= NGX_DYNAMIC_UPSTEAM_OP_PARAM_MAX_FAILS;
+                op->verbose = 1;
 
             } else if (ngx_strncmp("arg_fail_timeout", args[i].data, args[i].len) == 0) {
                 op->fail_timeout = ngx_atoi(var->data, var->len);
                 if (op->fail_timeout == NGX_ERROR) {
                     return NGX_ERROR;
                 }
+                op->op = NGX_DYNAMIC_UPSTEAM_OP_PARAM;
+                op->op_param |= NGX_DYNAMIC_UPSTEAM_OP_PARAM_FAIL_TIMEOUT;
+                op->verbose = 1;
 
             } else if (ngx_strncmp("arg_down", args[i].data, args[i].len) == 0) {
                 op->down = 1;
+                op->op = NGX_DYNAMIC_UPSTEAM_OP_PARAM;
+                op->op_param |= NGX_DYNAMIC_UPSTEAM_OP_PARAM_DOWN;
+                op->verbose = 1;
                 
             }
         }
@@ -308,6 +329,47 @@ ngx_dynamic_upstream_op_remove(ngx_http_request_t *r, ngx_dynamic_upstream_op_t 
 
 
 static ngx_int_t
+ngx_dynamic_upstream_op_update_param(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op,
+                                                      ngx_slab_pool_t *shpool, ngx_http_upstream_srv_conf_t *uscf)
+{
+    ngx_http_upstream_rr_peer_t   *peer, *target;
+    ngx_http_upstream_rr_peers_t  *peers;
+
+    peers = uscf->peer.data;
+
+    target = NULL;
+    for (peer = peers->peer; peer ; peer = peer->next) {
+        if (op->server.len == peer->name.len && ngx_strncmp(op->server.data, peer->name.data, peer->name.len) == 0) {
+            target = peer;
+            break;
+        }
+    }
+
+    if (target == NULL) {
+        return NGX_ERROR;
+    }
+
+    if (op->op_param & NGX_DYNAMIC_UPSTEAM_OP_PARAM_WEIGHT) {
+        target->weight = op->weight;
+    }
+
+    if (op->op_param & NGX_DYNAMIC_UPSTEAM_OP_PARAM_MAX_FAILS) {
+        target->max_fails = op->max_fails;
+    }
+
+    if (op->op_param & NGX_DYNAMIC_UPSTEAM_OP_PARAM_FAIL_TIMEOUT) {
+        target->fail_timeout = op->fail_timeout;
+    }
+
+    if (op->op_param & NGX_DYNAMIC_UPSTEAM_OP_PARAM_DOWN) {
+        target->down = op->down;
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
 ngx_dynamic_upstream_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op, ngx_slab_pool_t *shpool, ngx_http_upstream_srv_conf_t *uscf)
 {
     ngx_int_t  rc;
@@ -324,9 +386,10 @@ ngx_dynamic_upstream_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op, ng
 #if 0
     case NGX_DYNAMIC_UPSTEAM_OP_BACKUP:
         break;
-    case NGX_DYNAMIC_UPSTEAM_OP_PARAM:
-        break;
 #endif
+    case NGX_DYNAMIC_UPSTEAM_OP_PARAM:
+        rc = ngx_dynamic_upstream_op_update_param(r, op, shpool, uscf);
+        break;
     case NGX_DYNAMIC_UPSTEAM_OP_LIST:
     default:
         rc = NGX_OK;
@@ -367,7 +430,6 @@ ngx_dynamic_upstream_handler(ngx_http_request_t *r)
     ngx_http_upstream_srv_conf_t   *uscf;
     ngx_slab_pool_t                *shpool;
     
-
     if (r->method != NGX_HTTP_GET && r->method != NGX_HTTP_HEAD) {
         return NGX_HTTP_NOT_ALLOWED;
     }
