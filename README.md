@@ -54,9 +54,29 @@ You can operate upstreams dynamically with HTTP APIs.
 
 ```bash
 $ curl "http://127.0.0.1:6000/dynamic?upstream=backends"
-127.0.0.1:6001; #id=0
-127.0.0.1:6002; #id=1
-127.0.0.1:6003; #id=2
+127.0.0.1:6001;
+127.0.0.1:6002;
+127.0.0.1:6003;
+$
+```
+
+## verbose
+
+```bash
+$ curl "http://127.0.0.1:6000/dynamic?upstream=backends&verbose="
+127.0.0.1:6001 weight=1 max_fails=1 fail_timeout=10;
+127.0.0.1:6002 weight=1 max_fails=1 fail_timeout=10;
+127.0.0.1:6003 weight=1 max_fails=1 fail_timeout=10;
+$
+```
+
+## update_parameters
+
+```bash
+$ curl "http://127.0.0.1:6000/dynamic?upstream=backends&server=127.0.0.1:6003&weight=10&max_fails=5&fail_timeout=5"
+127.0.0.1:6001 weight=1 max_fails=1 fail_timeout=10;
+127.0.0.1:6002 weight=1 max_fails=1 fail_timeout=10;
+127.0.0.1:6003 weight=10 max_fails=5 fail_timeout=5;
 $
 ```
 
@@ -64,10 +84,10 @@ $
 
 ```bash
 $ curl "http://127.0.0.1:6000/dynamic?upstream=backends&add=&server=127.0.0.1:6004"
-127.0.0.1:6001; #id=0
-127.0.0.1:6002; #id=1
-127.0.0.1:6003; #id=2
-127.0.0.1:6004; #id=3
+127.0.0.1:6001;
+127.0.0.1:6002;
+127.0.0.1:6003;
+127.0.0.1:6004;
 $
 ```
 
@@ -75,9 +95,9 @@ $
 
 ```bash
 $ curl "http://127.0.0.1:6000/dynamic?upstream=backends&remove=&id=3"
-127.0.0.1:6001; #id=0
-127.0.0.1:6002; #id=1
-127.0.0.1:6004; #id=2
+127.0.0.1:6001;
+127.0.0.1:6002;
+127.0.0.1:6004;
 $
 ```
 
