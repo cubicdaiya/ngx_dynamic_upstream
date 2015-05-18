@@ -12,7 +12,6 @@
 #define NGX_DYNAMIC_UPSTEAM_OP_PARAM  4
 
 typedef struct ngx_dynamic_upstream_op_t {
-    ngx_int_t  id;
     ngx_int_t  op;
     ngx_int_t  backup;
     ngx_int_t  weight;
@@ -81,7 +80,6 @@ ngx_module_t ngx_dynamic_upstream_module = {
 
 static const ngx_str_t ngx_dynamic_upstream_params[] = {
     ngx_string("arg_upstream"),
-    ngx_string("arg_id"),
     ngx_string("arg_add"),
     ngx_string("arg_remove"),
     ngx_string("arg_backup"),
@@ -128,12 +126,6 @@ ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
                 }
                 ngx_cpystrn(op->upstream.data, var->data, var->len + 1);
                 op->upstream.len = var->len;
-
-            } else if (ngx_strncmp("arg_id", args[i].data, args[i].len) == 0) {
-                op->id = ngx_atoi(var->data, var->len);
-                if (op->id == NGX_ERROR) {
-                    return NGX_ERROR;
-                }
 
             } else if (ngx_strncmp("arg_add", args[i].data, args[i].len) == 0) {
                 op->op = NGX_DYNAMIC_UPSTEAM_OP_ADD;
@@ -257,29 +249,51 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
 static ngx_int_t
 ngx_dynamic_upstream_op_remove(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op, ngx_slab_pool_t *shpool, ngx_http_upstream_srv_conf_t *uscf)
 {
-    ngx_int_t                      i;
-    ngx_http_upstream_rr_peer_t   *peer, *prev;
+    ngx_http_upstream_rr_peer_t   *peer, *target, *prev;
     ngx_http_upstream_rr_peers_t  *peers;
 
     peers = uscf->peer.data;
 
-    if (peers->number < 2 || op->id > (ngx_int_t)peers->number - 1) {
+    if (peers->number < 2) {
         return NGX_ERROR;
     }
 
-    prev  = NULL;
-    for (peer = peers->peer, i = 0; i < op->id; peer = peer->next, i++) {
+    target = NULL;
+    prev = NULL;
+    for (peer = peers->peer; peer ; peer = peer->next) {
+        if (op->server.len == peer->name.len && ngx_strncmp(op->server.data, peer->name.data, peer->name.len) == 0) {
+            target = peer;
+            peer = peer->next;
+            break;
+        }
         prev = peer;
     }
 
-    if (prev == NULL) {
-        peers->peer = peer->next;
-    } else {
-        prev->next = peer->next;
+    // released removed peer
+    ngx_slab_free_locked(shpool, target);
+
+    // not found
+    if (target == NULL) {
+        return NGX_ERROR;
     }
 
-    peers->number--;
+    // found head
+    if (prev == NULL) {
+        peers->peer = peer;
+        goto ok;
+    }
 
+    // found tail
+    if (peer == NULL) {
+        prev->next = NULL;
+        goto ok;
+    }
+
+    // found inside
+    prev->next = peer;
+
+ ok:
+    peers->number--;
     return NGX_OK;
 }
 
@@ -322,7 +336,6 @@ static ngx_int_t
 ngx_dynamic_upstream_handler(ngx_http_request_t *r)
 {
     size_t                          size;
-    ngx_uint_t                      i;
     ngx_int_t                       rc;
     ngx_chain_t                     out;
     ngx_dynamic_upstream_op_t       op;
@@ -389,9 +402,8 @@ ngx_dynamic_upstream_handler(ngx_http_request_t *r)
     out.next = NULL;
 
     peers = uscf->peer.data;
-    i = 0;
-    for (peer = peers->peer; peer; peer = peer->next, i++) {
-        b->last = ngx_snprintf(b->last, size, "%s; #id=%d\n", peer->name.data, i);
+    for (peer = peers->peer; peer; peer = peer->next) {
+        b->last = ngx_snprintf(b->last, size, "%s;\n", peer->name.data);
     }
 
     r->headers_out.status = NGX_HTTP_OK;
