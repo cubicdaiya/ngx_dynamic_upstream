@@ -80,6 +80,26 @@ $ curl "http://127.0.0.1:6000/dynamic?upstream=backends&server=127.0.0.1:6003&we
 $
 ```
 
+## down
+
+```bash
+$ curl "http://127.0.0.1:6000/dynamic?upstream=backends&server=127.0.0.1:6003&down="
+127.0.0.1:6001 weight=1 max_fails=1 fail_timeout=10;
+127.0.0.1:6002 weight=1 max_fails=1 fail_timeout=10;
+127.0.0.1:6003 weight=1 max_fails=1 fail_timeout=10 down;
+$
+```
+
+## up
+
+```bash
+$ curl "http://127.0.0.1:6000/dynamic?upstream=backends&server=127.0.0.1:6003&up="
+127.0.0.1:6001 weight=1 max_fails=1 fail_timeout=10;
+127.0.0.1:6002 weight=1 max_fails=1 fail_timeout=10;
+127.0.0.1:6003 weight=1 max_fails=1 fail_timeout=10;
+$
+```
+
 ## add
 
 ```bash

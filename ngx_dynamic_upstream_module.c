@@ -14,7 +14,8 @@
 #define NGX_DYNAMIC_UPSTEAM_OP_PARAM_WEIGHT       1
 #define NGX_DYNAMIC_UPSTEAM_OP_PARAM_MAX_FAILS    2
 #define NGX_DYNAMIC_UPSTEAM_OP_PARAM_FAIL_TIMEOUT 4
-#define NGX_DYNAMIC_UPSTEAM_OP_PARAM_DOWN         8
+#define NGX_DYNAMIC_UPSTEAM_OP_PARAM_UP           8
+#define NGX_DYNAMIC_UPSTEAM_OP_PARAM_DOWN         16
 
 typedef struct ngx_dynamic_upstream_op_t {
     ngx_int_t verbose;
@@ -24,6 +25,7 @@ typedef struct ngx_dynamic_upstream_op_t {
     ngx_int_t weight;
     ngx_int_t max_fails;
     ngx_int_t fail_timeout;
+    ngx_int_t up;
     ngx_int_t down;
     ngx_str_t upstream;
     ngx_str_t server;
@@ -35,7 +37,7 @@ static ngx_int_t ngx_dynamic_upstream_op_remove(ngx_http_request_t *r, ngx_dynam
                                                 ngx_slab_pool_t *shpool, ngx_http_upstream_srv_conf_t *uscf);
 static ngx_int_t ngx_dynamic_upstream_op_update_param(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op,
                                                       ngx_slab_pool_t *shpool, ngx_http_upstream_srv_conf_t *uscf);
-//static ngx_int_t ngx_dynamic_upstream_op_backup(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op, ngx_http_upstream_srv_conf_t *uscf);
+/* static ngx_int_t ngx_dynamic_upstream_op_backup(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op, ngx_http_upstream_srv_conf_t *uscf); */
 
 static ngx_http_upstream_srv_conf_t *ngx_dynamic_upstream_get_zone(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op);
 static ngx_int_t ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op);
@@ -98,6 +100,7 @@ static const ngx_str_t ngx_dynamic_upstream_params[] = {
     ngx_string("arg_weight"),
     ngx_string("arg_max_fails"),
     ngx_string("arg_fail_timeout"),
+    ngx_string("arg_up"),
     ngx_string("arg_down")
 };
 
@@ -114,7 +117,7 @@ ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
 
     ngx_memzero(op, sizeof(ngx_dynamic_upstream_op_t));
 
-    // default setting for op
+    /* default setting for op */
     op->op = NGX_DYNAMIC_UPSTEAM_OP_LIST;
     ngx_str_null(&op->upstream);
     op->weight       = 1;
@@ -133,7 +136,7 @@ ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
         var = ngx_http_get_variable(r, &args[i], key);
 
         if (!var->not_found) {
-            if (ngx_strncmp("arg_upstream", args[i].data, args[i].len) == 0) {
+            if (ngx_strcmp("arg_upstream", args[i].data) == 0) {
                 op->upstream.data = ngx_palloc(r->pool, var->len + 1);
                 if (op->upstream.data == NULL) {
                     return NGX_ERROR;
@@ -141,19 +144,19 @@ ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
                 ngx_cpystrn(op->upstream.data, var->data, var->len + 1);
                 op->upstream.len = var->len;
 
-            } else if (ngx_strncmp("arg_verbose", args[i].data, args[i].len) == 0) {
+            } else if (ngx_strcmp("arg_verbose", args[i].data) == 0) {
                 op->verbose = 1;
 
-            } else if (ngx_strncmp("arg_add", args[i].data, args[i].len) == 0) {
+            } else if (ngx_strcmp("arg_add", args[i].data) == 0) {
                 op->op |= NGX_DYNAMIC_UPSTEAM_OP_ADD;
 
-            } else if (ngx_strncmp("arg_remove", args[i].data, args[i].len) == 0) {
+            } else if (ngx_strcmp("arg_remove", args[i].data) == 0) {
                 op->op |= NGX_DYNAMIC_UPSTEAM_OP_REMOVE;
 
-            } else if (ngx_strncmp("arg_backup", args[i].data, args[i].len) == 0) {
+            } else if (ngx_strcmp("arg_backup", args[i].data) == 0) {
                 op->backup = 1;
 
-            } else if (ngx_strncmp("arg_server", args[i].data, args[i].len) == 0) {
+            } else if (ngx_strcmp("arg_server", args[i].data) == 0) {
                 op->server.data = ngx_palloc(r->pool, var->len + 1);
                 if (op->server.data == NULL) {
                     return NGX_ERROR;
@@ -161,7 +164,7 @@ ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
                 ngx_cpystrn(op->server.data, var->data, var->len + 1);
                 op->server.len = var->len;
 
-            } else if (ngx_strncmp("arg_weight", args[i].data, args[i].len) == 0) {
+            } else if (ngx_strcmp("arg_weight", args[i].data) == 0) {
                 op->weight = ngx_atoi(var->data, var->len);
                 if (op->weight == NGX_ERROR) {
                     return NGX_ERROR;
@@ -170,7 +173,7 @@ ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
                 op->op_param |= NGX_DYNAMIC_UPSTEAM_OP_PARAM_WEIGHT;
                 op->verbose = 1;
 
-            } else if (ngx_strncmp("arg_max_fails", args[i].data, args[i].len) == 0) {
+            } else if (ngx_strcmp("arg_max_fails", args[i].data) == 0) {
                 op->max_fails = ngx_atoi(var->data, var->len);
                 if (op->max_fails == NGX_ERROR) {
                     return NGX_ERROR;
@@ -179,7 +182,7 @@ ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
                 op->op_param |= NGX_DYNAMIC_UPSTEAM_OP_PARAM_MAX_FAILS;
                 op->verbose = 1;
 
-            } else if (ngx_strncmp("arg_fail_timeout", args[i].data, args[i].len) == 0) {
+            } else if (ngx_strcmp("arg_fail_timeout", args[i].data) == 0) {
                 op->fail_timeout = ngx_atoi(var->data, var->len);
                 if (op->fail_timeout == NGX_ERROR) {
                     return NGX_ERROR;
@@ -188,11 +191,14 @@ ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
                 op->op_param |= NGX_DYNAMIC_UPSTEAM_OP_PARAM_FAIL_TIMEOUT;
                 op->verbose = 1;
 
-            } else if (ngx_strncmp("arg_down", args[i].data, args[i].len) == 0) {
-                op->down = ngx_atoi(var->data, var->len);
-                if (op->down <= NGX_ERROR || op->down > 1) {
-                    return NGX_ERROR;
-                }
+            } else if (ngx_strcmp("arg_up", args[i].data) == 0) {
+                op->up = 1;
+                op->op |= NGX_DYNAMIC_UPSTEAM_OP_PARAM;
+                op->op_param |= NGX_DYNAMIC_UPSTEAM_OP_PARAM_UP;
+                op->verbose = 1;
+
+            } else if (ngx_strcmp("arg_down", args[i].data) == 0) {
+                op->down = 1;
                 op->op |= NGX_DYNAMIC_UPSTEAM_OP_PARAM;
                 op->op_param |= NGX_DYNAMIC_UPSTEAM_OP_PARAM_DOWN;
                 op->verbose = 1;
@@ -201,6 +207,7 @@ ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
         }
     }
 
+    /* can not add and remove at once */
     if ((op->op & NGX_DYNAMIC_UPSTEAM_OP_ADD) &&
         (op->op & NGX_DYNAMIC_UPSTEAM_OP_REMOVE))
     {
@@ -211,6 +218,11 @@ ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
         op->op = NGX_DYNAMIC_UPSTEAM_OP_ADD;
     } else if (op->op & NGX_DYNAMIC_UPSTEAM_OP_REMOVE) {
         op->op = NGX_DYNAMIC_UPSTEAM_OP_REMOVE;
+    }
+
+    /* can not up and down at once */
+    if (op->up && op->down) {
+        return NGX_ERROR;
     }
 
     return NGX_OK;
@@ -281,10 +293,10 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
     }
     peers->number++;
 
-    last->next->name         = u.url;
-    last->next->server       = u.url;
-    last->next->sockaddr     = u.addrs[0].sockaddr;
-    last->next->socklen      = u.addrs[0].socklen;
+    last->next->name     = u.url;
+    last->next->server   = u.url;
+    last->next->sockaddr = u.addrs[0].sockaddr;
+    last->next->socklen  = u.addrs[0].socklen;
 
     if (op->op_param & NGX_DYNAMIC_UPSTEAM_OP_PARAM_WEIGHT) {
         last->next->weight = op->weight;
@@ -335,27 +347,27 @@ ngx_dynamic_upstream_op_remove(ngx_http_request_t *r, ngx_dynamic_upstream_op_t 
         prev = peer;
     }
 
-    // released removed peer
+    /* released removed peer */
     ngx_slab_free_locked(shpool, target);
 
-    // not found
+    /* not found */
     if (target == NULL) {
         return NGX_ERROR;
     }
 
-    // found head
+    /* found head */
     if (prev == NULL) {
         peers->peer = peer;
         goto ok;
     }
 
-    // found tail
+    /* found tail */
     if (peer == NULL) {
         prev->next = NULL;
         goto ok;
     }
 
-    // found inside
+    /* found inside */
     prev->next = peer;
 
  ok:
@@ -399,8 +411,12 @@ ngx_dynamic_upstream_op_update_param(ngx_http_request_t *r, ngx_dynamic_upstream
         target->fail_timeout = op->fail_timeout;
     }
 
+    if (op->op_param & NGX_DYNAMIC_UPSTEAM_OP_PARAM_UP) {
+        target->down = 0;
+    }
+
     if (op->op_param & NGX_DYNAMIC_UPSTEAM_OP_PARAM_DOWN) {
-        target->down = op->down;
+        target->down = 1;
     }
 
     return NGX_OK;
@@ -448,8 +464,10 @@ ngx_dynamic_upstream_create_response_buf(ngx_http_upstream_rr_peers_t *peers, ng
     ngx_http_upstream_rr_peer_t    *peer;
     for (peer = peers->peer; peer; peer = peer->next) {
         if (verbose) {
-            b->last = ngx_snprintf(b->last, size, "%s weight=%d max_fails=%d fail_timeout=%d down=%d;\n",
+            b->last = ngx_snprintf(b->last, size, "%s weight=%d max_fails=%d fail_timeout=%d",
                                    peer->name.data, peer->weight, peer->max_fails, peer->fail_timeout, peer->down);
+            b->last = peer->down ? ngx_snprintf(b->last, size, " down;\n") : ngx_snprintf(b->last, size, ";\n");
+
         } else {
             b->last = ngx_snprintf(b->last, size, "%s;\n", peer->name.data);
         }
