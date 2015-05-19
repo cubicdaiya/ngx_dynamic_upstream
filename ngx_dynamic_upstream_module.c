@@ -462,15 +462,17 @@ static void
 ngx_dynamic_upstream_create_response_buf(ngx_http_upstream_rr_peers_t *peers, ngx_buf_t *b, size_t size, ngx_int_t verbose)
 {
     ngx_http_upstream_rr_peer_t    *peer;
+
     for (peer = peers->peer; peer; peer = peer->next) {
         if (verbose) {
             b->last = ngx_snprintf(b->last, size, "%s weight=%d max_fails=%d fail_timeout=%d",
                                    peer->name.data, peer->weight, peer->max_fails, peer->fail_timeout, peer->down);
-            b->last = peer->down ? ngx_snprintf(b->last, size, " down;\n") : ngx_snprintf(b->last, size, ";\n");
 
         } else {
-            b->last = ngx_snprintf(b->last, size, "%s;\n", peer->name.data);
+            b->last = ngx_snprintf(b->last, size, "%s", peer->name.data);
+
         }
+        b->last = peer->down ? ngx_snprintf(b->last, size, " down;\n") : ngx_snprintf(b->last, size, ";\n");
     }
 }
 
