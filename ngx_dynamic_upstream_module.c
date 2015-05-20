@@ -129,6 +129,10 @@ ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
     for (i=0;i<args_size;i++) {
         low = ngx_pnalloc(r->pool, args[i].len);
         if (low == NULL) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "failed to allocate memory from r->pool %s:%d",
+                          __FUNCTION__,
+                          __LINE__);
             return NGX_ERROR;
         }
 
@@ -139,6 +143,10 @@ ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
             if (ngx_strcmp("arg_upstream", args[i].data) == 0) {
                 op->upstream.data = ngx_palloc(r->pool, var->len + 1);
                 if (op->upstream.data == NULL) {
+                    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                                  "failed to allocate memory from r->pool %s:%d",
+                                  __FUNCTION__,
+                                  __LINE__);
                     return NGX_ERROR;
                 }
                 ngx_cpystrn(op->upstream.data, var->data, var->len + 1);
@@ -159,6 +167,10 @@ ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
             } else if (ngx_strcmp("arg_server", args[i].data) == 0) {
                 op->server.data = ngx_palloc(r->pool, var->len + 1);
                 if (op->server.data == NULL) {
+                    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                                  "failed to allocate memory from r->pool %s:%d",
+                                  __FUNCTION__,
+                                  __LINE__);
                     return NGX_ERROR;
                 }
                 ngx_cpystrn(op->server.data, var->data, var->len + 1);
