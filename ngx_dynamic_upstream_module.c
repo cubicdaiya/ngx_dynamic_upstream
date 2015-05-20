@@ -347,13 +347,13 @@ ngx_dynamic_upstream_op_remove(ngx_http_request_t *r, ngx_dynamic_upstream_op_t 
         prev = peer;
     }
 
-    /* released removed peer */
-    ngx_slab_free_locked(shpool, target);
-
     /* not found */
     if (target == NULL) {
         return NGX_ERROR;
     }
+
+    /* released removed peer */
+    ngx_slab_free_locked(shpool, target);
 
     /* found head */
     if (prev == NULL) {
