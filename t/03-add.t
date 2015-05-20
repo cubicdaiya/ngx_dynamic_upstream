@@ -51,7 +51,7 @@ __DATA__
 127.0.0.1:6004 weight=10 max_fails=1 fail_timeout=10;
 
 
-=== TEST 4: fail to add
+=== TEST 3: add duplicated server
 --- http_config
     upstream backends {
         zone zone_for_backends 128k;
@@ -65,5 +65,23 @@ __DATA__
     }
 --- request
     GET /dynamic?upstream=zone_for_backends&server=127.0.0.1:6003&add=
+--- response_body_like: 500 Internal Server Error
+--- error_code: 500
+
+
+=== TEST 4: add and remove
+--- http_config
+    upstream backends {
+        zone zone_for_backends 128k;
+        server 127.0.0.1:6001;
+        server 127.0.0.1:6002;
+        server 127.0.0.1:6003;
+    }
+--- config
+    location /dynamic {
+        dynamic_upstream;
+    }
+--- request
+    GET /dynamic?upstream=zone_for_backends&server=127.0.0.1:6004&add=&remove=
 --- response_body_like: 500 Internal Server Error
 --- error_code: 500
