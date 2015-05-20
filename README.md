@@ -53,7 +53,7 @@ You can operate upstreams dynamically with HTTP APIs.
 ## list
 
 ```bash
-$ curl "http://127.0.0.1:6000/dynamic?upstream=backends"
+$ curl "http://127.0.0.1:6000/dynamic?upstream=zone_for_backends"
 127.0.0.1:6001;
 127.0.0.1:6002;
 127.0.0.1:6003;
@@ -63,7 +63,7 @@ $
 ## verbose
 
 ```bash
-$ curl "http://127.0.0.1:6000/dynamic?upstream=backends&verbose="
+$ curl "http://127.0.0.1:6000/dynamic?upstream=zone_for_backends&verbose="
 127.0.0.1:6001 weight=1 max_fails=1 fail_timeout=10;
 127.0.0.1:6002 weight=1 max_fails=1 fail_timeout=10;
 127.0.0.1:6003 weight=1 max_fails=1 fail_timeout=10;
@@ -73,7 +73,7 @@ $
 ## update_parameters
 
 ```bash
-$ curl "http://127.0.0.1:6000/dynamic?upstream=backends&server=127.0.0.1:6003&weight=10&max_fails=5&fail_timeout=5"
+$ curl "http://127.0.0.1:6000/dynamic?upstream=zone_for_backends&server=127.0.0.1:6003&weight=10&max_fails=5&fail_timeout=5"
 127.0.0.1:6001 weight=1 max_fails=1 fail_timeout=10;
 127.0.0.1:6002 weight=1 max_fails=1 fail_timeout=10;
 127.0.0.1:6003 weight=10 max_fails=5 fail_timeout=5;
@@ -89,7 +89,7 @@ The supported parameters are blow.
 ## down
 
 ```bash
-$ curl "http://127.0.0.1:6000/dynamic?upstream=backends&server=127.0.0.1:6003&down="
+$ curl "http://127.0.0.1:6000/dynamic?upstream=zone_for_backends&server=127.0.0.1:6003&down="
 127.0.0.1:6001 weight=1 max_fails=1 fail_timeout=10;
 127.0.0.1:6002 weight=1 max_fails=1 fail_timeout=10;
 127.0.0.1:6003 weight=1 max_fails=1 fail_timeout=10 down;
@@ -99,7 +99,7 @@ $
 ## up
 
 ```bash
-$ curl "http://127.0.0.1:6000/dynamic?upstream=backends&server=127.0.0.1:6003&up="
+$ curl "http://127.0.0.1:6000/dynamic?upstream=zone_for_backends&server=127.0.0.1:6003&up="
 127.0.0.1:6001 weight=1 max_fails=1 fail_timeout=10;
 127.0.0.1:6002 weight=1 max_fails=1 fail_timeout=10;
 127.0.0.1:6003 weight=1 max_fails=1 fail_timeout=10;
@@ -109,7 +109,7 @@ $
 ## add
 
 ```bash
-$ curl "http://127.0.0.1:6000/dynamic?upstream=backends&add=&server=127.0.0.1:6004"
+$ curl "http://127.0.0.1:6000/dynamic?upstream=zone_for_backends&add=&server=127.0.0.1:6004"
 127.0.0.1:6001;
 127.0.0.1:6002;
 127.0.0.1:6003;
@@ -120,7 +120,7 @@ $
 ## remove
 
 ```bash
-$ curl "http://127.0.0.1:6000/dynamic?upstream=backends&remove=&server=127.0.0.1:6003"
+$ curl "http://127.0.0.1:6000/dynamic?upstream=zone_for_backends&remove=&server=127.0.0.1:6003"
 127.0.0.1:6001;
 127.0.0.1:6002;
 127.0.0.1:6004;
