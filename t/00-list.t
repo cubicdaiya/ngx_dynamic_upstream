@@ -47,3 +47,21 @@ __DATA__
 127.0.0.1:6001 weight=1 max_fails=1 fail_timeout=10;
 127.0.0.1:6002 weight=1 max_fails=1 fail_timeout=10;
 127.0.0.1:6003 weight=1 max_fails=1 fail_timeout=10;
+
+
+=== TEST 3: not found upstream
+--- http_config
+    upstream backends {
+        zone zone_for_backends 128k;
+        server 127.0.0.1:6001;
+        server 127.0.0.1:6002;
+        server 127.0.0.1:6003;
+    }
+--- config
+    location /dynamic {
+        dynamic_upstream;
+    }
+--- request
+    GET /dynamic?upstream=not_found
+--- response_body_like: 400 Bad Request
+--- error_code: 400

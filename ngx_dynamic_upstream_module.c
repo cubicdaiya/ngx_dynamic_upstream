@@ -519,7 +519,7 @@ ngx_dynamic_upstream_handler(ngx_http_request_t *r)
     
     uscf = ngx_dynamic_upstream_get_zone(r, &op);
     if (uscf == NULL) {
-        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        return NGX_HTTP_BAD_REQUEST;
     }
 
     shpool = (ngx_slab_pool_t *) uscf->shm_zone->shm.addr;
