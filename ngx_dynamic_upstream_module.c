@@ -531,6 +531,10 @@ ngx_dynamic_upstream_handler(ngx_http_request_t *r)
     
     uscf = ngx_dynamic_upstream_get_zone(r, &op);
     if (uscf == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "upstream is not found. %s:%d",
+                      __FUNCTION__,
+                      __LINE__);
         return NGX_HTTP_BAD_REQUEST;
     }
 
