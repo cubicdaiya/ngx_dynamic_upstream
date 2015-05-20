@@ -30,7 +30,7 @@ __DATA__
 127.0.0.1:6004;
 
 
-=== TEST 1: add and update parameters
+=== TEST 2: add and update parameters
 --- http_config
     upstream backends {
         zone zone_for_backends 128k;
