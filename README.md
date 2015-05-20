@@ -80,6 +80,12 @@ $ curl "http://127.0.0.1:6000/dynamic?upstream=backends&server=127.0.0.1:6003&we
 $
 ```
 
+The supported parameters are blow.
+
+ * weight
+ * max_fails
+ * fail_timeout
+
 ## down
 
 ```bash
