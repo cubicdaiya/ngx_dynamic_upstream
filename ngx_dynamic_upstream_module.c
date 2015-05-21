@@ -275,6 +275,10 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
     peers = uscf->peer.data;
     for (peer = peers->peer, last = peer; peer; peer = peer->next) {
         if (op->server.len == peer->name.len && ngx_strncmp(op->server.data, peer->name.data, peer->name.len) == 0) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "server already exists in upstream. %s:%d",
+                          __FUNCTION__,
+                          __LINE__);
             return NGX_ERROR;
         }
         last = peer;
@@ -284,6 +288,10 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
 
     u.url.data = ngx_slab_alloc_locked(shpool, op->server.len);
     if (u.url.data == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "failed to allocate memory from slab %s:%d",
+                      __FUNCTION__,
+                      __LINE__);
         return NGX_ERROR;
     }
     ngx_cpystrn(u.url.data, op->server.data, op->server.len + 1);
@@ -301,6 +309,10 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
 
     last->next = ngx_slab_calloc_locked(shpool, sizeof(ngx_http_upstream_rr_peer_t));
     if (last->next == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "failed to allocate memory from slab %s:%d",
+                      __FUNCTION__,
+                      __LINE__);
         return NGX_ERROR;
     }
     peers->number++;
@@ -361,6 +373,10 @@ ngx_dynamic_upstream_op_remove(ngx_http_request_t *r, ngx_dynamic_upstream_op_t 
 
     /* not found */
     if (target == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "server is not found. %s:%d",
+                      __FUNCTION__,
+                      __LINE__);
         return NGX_ERROR;
     }
 
@@ -406,6 +422,10 @@ ngx_dynamic_upstream_op_update_param(ngx_http_request_t *r, ngx_dynamic_upstream
     }
 
     if (target == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "server is not found. %s:%d",
+                      __FUNCTION__,
+                      __LINE__);
         return NGX_ERROR;
     }
 
