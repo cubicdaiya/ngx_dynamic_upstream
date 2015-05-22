@@ -24,9 +24,9 @@ __DATA__
 --- request
     GET /dynamic?upstream=zone_for_backends&server=127.0.0.1:6003&down=
 --- response_body
-127.0.0.1:6001 weight=1 max_fails=1 fail_timeout=10;
-127.0.0.1:6002 weight=1 max_fails=1 fail_timeout=10;
-127.0.0.1:6003 weight=1 max_fails=1 fail_timeout=10 down;
+server 127.0.0.1:6001 weight=1 max_fails=1 fail_timeout=10;
+server 127.0.0.1:6002 weight=1 max_fails=1 fail_timeout=10;
+server 127.0.0.1:6003 weight=1 max_fails=1 fail_timeout=10 down;
 
 
 === TEST 2: down and up

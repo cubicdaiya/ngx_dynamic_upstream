@@ -24,9 +24,9 @@ __DATA__
 --- request
     GET /dynamic?upstream=zone_for_backends
 --- response_body
-127.0.0.1:6001;
-127.0.0.1:6002;
-127.0.0.1:6003;
+server 127.0.0.1:6001;
+server 127.0.0.1:6002;
+server 127.0.0.1:6003;
 
 
 === TEST 2: list verbose
@@ -44,9 +44,9 @@ __DATA__
 --- request
     GET /dynamic?upstream=zone_for_backends&verbose=
 --- response_body
-127.0.0.1:6001 weight=1 max_fails=1 fail_timeout=10;
-127.0.0.1:6002 weight=1 max_fails=1 fail_timeout=10;
-127.0.0.1:6003 weight=1 max_fails=1 fail_timeout=10;
+server 127.0.0.1:6001 weight=1 max_fails=1 fail_timeout=10;
+server 127.0.0.1:6002 weight=1 max_fails=1 fail_timeout=10;
+server 127.0.0.1:6003 weight=1 max_fails=1 fail_timeout=10;
 
 
 === TEST 3: not found upstream

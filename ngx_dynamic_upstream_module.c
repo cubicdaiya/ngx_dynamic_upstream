@@ -497,11 +497,11 @@ ngx_dynamic_upstream_create_response_buf(ngx_http_upstream_rr_peers_t *peers, ng
 
     for (peer = peers->peer; peer; peer = peer->next) {
         if (verbose) {
-            b->last = ngx_snprintf(b->last, size, "%s weight=%d max_fails=%d fail_timeout=%d",
+            b->last = ngx_snprintf(b->last, size, "server %s weight=%d max_fails=%d fail_timeout=%d",
                                    peer->name.data, peer->weight, peer->max_fails, peer->fail_timeout, peer->down);
 
         } else {
-            b->last = ngx_snprintf(b->last, size, "%s", peer->name.data);
+            b->last = ngx_snprintf(b->last, size, "server %s", peer->name.data);
 
         }
         b->last = peer->down ? ngx_snprintf(b->last, size, " down;\n") : ngx_snprintf(b->last, size, ";\n");

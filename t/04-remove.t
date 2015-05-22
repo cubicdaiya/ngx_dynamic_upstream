@@ -24,8 +24,8 @@ __DATA__
 --- request
     GET /dynamic?upstream=zone_for_backends&server=127.0.0.1:6001&remove=
 --- response_body
-127.0.0.1:6002;
-127.0.0.1:6003;
+server 127.0.0.1:6002;
+server 127.0.0.1:6003;
 
 
 === TEST 2: remove tail
@@ -43,8 +43,8 @@ __DATA__
 --- request
     GET /dynamic?upstream=zone_for_backends&server=127.0.0.1:6003&remove=
 --- response_body
-127.0.0.1:6001;
-127.0.0.1:6002;
+server 127.0.0.1:6001;
+server 127.0.0.1:6002;
 
 
 === TEST 3: remove middle
@@ -62,8 +62,8 @@ __DATA__
 --- request
     GET /dynamic?upstream=zone_for_backends&server=127.0.0.1:6002&remove=
 --- response_body
-127.0.0.1:6001;
-127.0.0.1:6003;
+server 127.0.0.1:6001;
+server 127.0.0.1:6003;
 
 
 === TEST 4: fail to remove
