@@ -1,1 +1,4 @@
 t/servroot
+nginx-build.ini
+tmp/
+cpanm
