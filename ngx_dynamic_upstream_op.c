@@ -200,7 +200,8 @@ ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
 
 
 ngx_int_t
-ngx_dynamic_upstream_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op, ngx_slab_pool_t *shpool, ngx_http_upstream_srv_conf_t *uscf)
+ngx_dynamic_upstream_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op,
+                        ngx_slab_pool_t *shpool, ngx_http_upstream_srv_conf_t *uscf)
 {
     ngx_int_t  rc;
 
@@ -231,7 +232,8 @@ ngx_dynamic_upstream_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op, ng
 
 
 static ngx_int_t
-ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op, ngx_slab_pool_t *shpool, ngx_http_upstream_srv_conf_t *uscf)
+ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op,
+                            ngx_slab_pool_t *shpool, ngx_http_upstream_srv_conf_t *uscf)
 {
     ngx_http_upstream_rr_peer_t   *peer, *last;
     ngx_http_upstream_rr_peers_t  *peers;
@@ -319,7 +321,8 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
 
 
 static ngx_int_t
-ngx_dynamic_upstream_op_remove(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op, ngx_slab_pool_t *shpool, ngx_http_upstream_srv_conf_t *uscf)
+ngx_dynamic_upstream_op_remove(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op,
+                               ngx_slab_pool_t *shpool, ngx_http_upstream_srv_conf_t *uscf)
 {
     ngx_http_upstream_rr_peer_t   *peer, *target, *prev;
     ngx_http_upstream_rr_peers_t  *peers;
@@ -379,7 +382,7 @@ ngx_dynamic_upstream_op_remove(ngx_http_request_t *r, ngx_dynamic_upstream_op_t 
 
 static ngx_int_t
 ngx_dynamic_upstream_op_update_param(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op,
-                                                      ngx_slab_pool_t *shpool, ngx_http_upstream_srv_conf_t *uscf)
+                                     ngx_slab_pool_t *shpool, ngx_http_upstream_srv_conf_t *uscf)
 {
     ngx_http_upstream_rr_peer_t   *peer, *target;
     ngx_http_upstream_rr_peers_t  *peers;
