@@ -80,5 +80,5 @@ server 127.0.0.1:6003;
     }
 --- request
     GET /dynamic?upstream=zone_for_backends&server=127.0.0.1:6004&remove=
---- response_body_like: 500 Internal Server Error
---- error_code: 500
+--- response_body_like: 400 Bad Request
+--- error_code: 400

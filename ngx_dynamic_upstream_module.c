@@ -29,6 +29,7 @@ typedef struct ngx_dynamic_upstream_op_t {
     ngx_int_t down;
     ngx_str_t upstream;
     ngx_str_t server;
+    ngx_uint_t status;
 } ngx_dynamic_upstream_op_t;
 
 static ngx_int_t ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op,
@@ -119,6 +120,7 @@ ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
 
     /* default setting for op */
     op->op = NGX_DYNAMIC_UPSTEAM_OP_LIST;
+    op->status = NGX_HTTP_OK;
     ngx_str_null(&op->upstream);
     op->weight       = 1;
     op->max_fails    = 1;
@@ -129,6 +131,7 @@ ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
     for (i=0;i<args_size;i++) {
         low = ngx_pnalloc(r->pool, args[i].len);
         if (low == NULL) {
+            op->status = NGX_HTTP_INTERNAL_SERVER_ERROR;
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                           "failed to allocate memory from r->pool %s:%d",
                           __FUNCTION__,
@@ -143,6 +146,7 @@ ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
             if (ngx_strcmp("arg_upstream", args[i].data) == 0) {
                 op->upstream.data = ngx_palloc(r->pool, var->len + 1);
                 if (op->upstream.data == NULL) {
+                    op->status = NGX_HTTP_INTERNAL_SERVER_ERROR;
                     ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                                   "failed to allocate memory from r->pool %s:%d",
                                   __FUNCTION__,
@@ -167,6 +171,7 @@ ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
             } else if (ngx_strcmp("arg_server", args[i].data) == 0) {
                 op->server.data = ngx_palloc(r->pool, var->len + 1);
                 if (op->server.data == NULL) {
+                    op->status = NGX_HTTP_INTERNAL_SERVER_ERROR;
                     ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                                   "failed to allocate memory from r->pool %s:%d",
                                   __FUNCTION__,
@@ -179,6 +184,11 @@ ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
             } else if (ngx_strcmp("arg_weight", args[i].data) == 0) {
                 op->weight = ngx_atoi(var->data, var->len);
                 if (op->weight == NGX_ERROR) {
+                    op->status = NGX_HTTP_BAD_REQUEST;
+                    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                                  "weight is not number. %s:%d",
+                                  __FUNCTION__,
+                                  __LINE__);
                     return NGX_ERROR;
                 }
                 op->op |= NGX_DYNAMIC_UPSTEAM_OP_PARAM;
@@ -188,6 +198,11 @@ ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
             } else if (ngx_strcmp("arg_max_fails", args[i].data) == 0) {
                 op->max_fails = ngx_atoi(var->data, var->len);
                 if (op->max_fails == NGX_ERROR) {
+                    op->status = NGX_HTTP_BAD_REQUEST;
+                    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                                  "max_fails is not number. %s:%d",
+                                  __FUNCTION__,
+                                  __LINE__);
                     return NGX_ERROR;
                 }
                 op->op |= NGX_DYNAMIC_UPSTEAM_OP_PARAM;
@@ -197,6 +212,11 @@ ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
             } else if (ngx_strcmp("arg_fail_timeout", args[i].data) == 0) {
                 op->fail_timeout = ngx_atoi(var->data, var->len);
                 if (op->fail_timeout == NGX_ERROR) {
+                    op->status = NGX_HTTP_BAD_REQUEST;
+                    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                                  "fail_timeout is not number. %s:%d",
+                                  __FUNCTION__,
+                                  __LINE__);
                     return NGX_ERROR;
                 }
                 op->op |= NGX_DYNAMIC_UPSTEAM_OP_PARAM;
@@ -223,6 +243,11 @@ ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
     if ((op->op & NGX_DYNAMIC_UPSTEAM_OP_ADD) &&
         (op->op & NGX_DYNAMIC_UPSTEAM_OP_REMOVE))
     {
+        op->status = NGX_HTTP_BAD_REQUEST;
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "add and remove at once are not allowed. %s:%d",
+                      __FUNCTION__,
+                      __LINE__);
         return NGX_ERROR;
     }
 
@@ -234,6 +259,11 @@ ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
 
     /* can not up and down at once */
     if (op->up && op->down) {
+        op->status = NGX_HTTP_BAD_REQUEST;
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "down and up at once are not allowed. %s:%d",
+                      __FUNCTION__,
+                      __LINE__);
         return NGX_ERROR;
     }
 
@@ -275,8 +305,9 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
     peers = uscf->peer.data;
     for (peer = peers->peer, last = peer; peer; peer = peer->next) {
         if (op->server.len == peer->name.len && ngx_strncmp(op->server.data, peer->name.data, peer->name.len) == 0) {
+            op->status = NGX_HTTP_BAD_REQUEST;
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "%s already exists in upstream. %s:%d",
+                          "server %s already exists in upstream. %s:%d",
                           op->server.data,
                           __FUNCTION__,
                           __LINE__);
@@ -289,6 +320,7 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
 
     u.url.data = ngx_slab_alloc_locked(shpool, op->server.len);
     if (u.url.data == NULL) {
+        op->status = NGX_HTTP_INTERNAL_SERVER_ERROR;
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "failed to allocate memory from slab %s:%d",
                       __FUNCTION__,
@@ -305,11 +337,13 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
                           "%s in upstream \"%V\"", u.err, &u.url);
         }
 
+        op->status = NGX_HTTP_INTERNAL_SERVER_ERROR;
         return NGX_ERROR;
     }
 
     last->next = ngx_slab_calloc_locked(shpool, sizeof(ngx_http_upstream_rr_peer_t));
     if (last->next == NULL) {
+        op->status = NGX_HTTP_INTERNAL_SERVER_ERROR;
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "failed to allocate memory from slab %s:%d",
                       __FUNCTION__,
@@ -358,6 +392,7 @@ ngx_dynamic_upstream_op_remove(ngx_http_request_t *r, ngx_dynamic_upstream_op_t 
     peers = uscf->peer.data;
 
     if (peers->number < 2) {
+        op->status = NGX_HTTP_BAD_REQUEST;
         return NGX_ERROR;
     }
 
@@ -374,8 +409,10 @@ ngx_dynamic_upstream_op_remove(ngx_http_request_t *r, ngx_dynamic_upstream_op_t 
 
     /* not found */
     if (target == NULL) {
+        op->status = NGX_HTTP_BAD_REQUEST;
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "server is not found. %s:%d",
+                      "server %s is not found. %s:%d",
+                      op->server.data,
                       __FUNCTION__,
                       __LINE__);
         return NGX_ERROR;
@@ -423,8 +460,10 @@ ngx_dynamic_upstream_op_update_param(ngx_http_request_t *r, ngx_dynamic_upstream
     }
 
     if (target == NULL) {
+        op->status = NGX_HTTP_BAD_REQUEST;
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "server is not found. %s:%d",
+                      "server %s is not found. %s:%d",
+                      op->server.data,
                       __FUNCTION__,
                       __LINE__);
         return NGX_ERROR;
@@ -481,10 +520,6 @@ ngx_dynamic_upstream_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op, ng
     default:
         rc = NGX_OK;
         break;
-    }
-
-    if (rc != NGX_OK) {
-        return NGX_ERROR;
     }
 
     return rc;
@@ -547,7 +582,10 @@ ngx_dynamic_upstream_handler(ngx_http_request_t *r)
 
     rc = ngx_dynamic_upstream_build_op(r, &op);
     if (rc != NGX_OK) {
-        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        if (op.status == NGX_HTTP_OK) {
+            return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        }
+        return op.status;
     }
     
     uscf = ngx_dynamic_upstream_get_zone(r, &op);
@@ -565,7 +603,10 @@ ngx_dynamic_upstream_handler(ngx_http_request_t *r)
     rc = ngx_dynamic_upstream_op(r, &op, shpool, uscf);
     if (rc != NGX_OK) {
         ngx_shmtx_unlock(&shpool->mutex);
-        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        if (op.status == NGX_HTTP_OK) {
+            return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        }
+        return op.status;
     }
 
     ngx_shmtx_unlock(&shpool->mutex);
