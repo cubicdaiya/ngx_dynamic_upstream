@@ -276,7 +276,8 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
     for (peer = peers->peer, last = peer; peer; peer = peer->next) {
         if (op->server.len == peer->name.len && ngx_strncmp(op->server.data, peer->name.data, peer->name.len) == 0) {
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "server already exists in upstream. %s:%d",
+                          "%s already exists in upstream. %s:%d",
+                          op->server.data,
                           __FUNCTION__,
                           __LINE__);
             return NGX_ERROR;
