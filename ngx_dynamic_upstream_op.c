@@ -316,6 +316,9 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
         last->next->down = op->down;
     }
 
+    ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
+                  "added server %s", op->server.data);
+
     return NGX_OK;
 }
 
@@ -376,6 +379,10 @@ ngx_dynamic_upstream_op_remove(ngx_http_request_t *r, ngx_dynamic_upstream_op_t 
 
  ok:
     peers->number--;
+
+    ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
+                  "removed server %s", op->server.data);
+
     return NGX_OK;
 }
 
@@ -423,10 +430,14 @@ ngx_dynamic_upstream_op_update_param(ngx_http_request_t *r, ngx_dynamic_upstream
 
     if (op->op_param & NGX_DYNAMIC_UPSTEAM_OP_PARAM_UP) {
         target->down = 0;
+        ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
+                      "downed server %s", op->server.data);
     }
 
     if (op->op_param & NGX_DYNAMIC_UPSTEAM_OP_PARAM_DOWN) {
         target->down = 1;
+        ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
+                      "upped server %s", op->server.data);
     }
 
     return NGX_OK;
