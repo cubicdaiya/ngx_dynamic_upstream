@@ -63,5 +63,5 @@ server 127.0.0.1:6003 weight=1 max_fails=1 fail_timeout=10;
     }
 --- request
     GET /dynamic?upstream=not_found
---- response_body_like: 400 Bad Request
---- error_code: 400
+--- response_body_like: 404 Not Found
+--- error_code: 404

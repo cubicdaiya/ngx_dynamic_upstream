@@ -556,7 +556,7 @@ ngx_dynamic_upstream_handler(ngx_http_request_t *r)
                       "upstream is not found. %s:%d",
                       __FUNCTION__,
                       __LINE__);
-        return NGX_HTTP_BAD_REQUEST;
+        return NGX_HTTP_NOT_FOUND;
     }
 
     shpool = (ngx_slab_pool_t *) uscf->shm_zone->shm.addr;
