@@ -1,15 +1,18 @@
 #ifndef NGX_DYNAMIC_UPSTREAM_H
 #define NGX_DYNAMIC_UPSTREAM_H
 
+
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
+
 
 #define NGX_DYNAMIC_UPSTEAM_OP_LIST   0
 #define NGX_DYNAMIC_UPSTEAM_OP_ADD    1
 #define NGX_DYNAMIC_UPSTEAM_OP_REMOVE 2
 #define NGX_DYNAMIC_UPSTEAM_OP_BACKUP 4
 #define NGX_DYNAMIC_UPSTEAM_OP_PARAM  8
+
 
 #define NGX_DYNAMIC_UPSTEAM_OP_PARAM_WEIGHT       1
 #define NGX_DYNAMIC_UPSTEAM_OP_PARAM_MAX_FAILS    2
