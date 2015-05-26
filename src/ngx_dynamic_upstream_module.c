@@ -7,7 +7,7 @@
 
 
 static ngx_http_upstream_srv_conf_t *ngx_dynamic_upstream_get_zone(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op);
-static void ngx_dynamic_upstream_create_response_buf(ngx_http_upstream_rr_peers_t *peers, ngx_buf_t *b, size_t size, ngx_int_t verbose);
+static ngx_int_t ngx_dynamic_upstream_create_response_buf(ngx_http_upstream_rr_peers_t *peers, ngx_buf_t *b, size_t size, ngx_int_t verbose);
 static ngx_int_t ngx_dynamic_upstream_handler(ngx_http_request_t *r);
 static char *ngx_dynamic_upstream(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
@@ -81,22 +81,35 @@ ngx_dynamic_upstream_get_zone(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
 }    
 
 
-static void
+static ngx_int_t
 ngx_dynamic_upstream_create_response_buf(ngx_http_upstream_rr_peers_t *peers, ngx_buf_t *b, size_t size, ngx_int_t verbose)
 {
-    ngx_http_upstream_rr_peer_t    *peer;
+    ngx_http_upstream_rr_peer_t  *peer;
+    u_char                        namebuf[512], *last;
+
+    last = b->last + size;
 
     for (peer = peers->peer; peer; peer = peer->next) {
+
+        if (peer->name.len > 511) {
+            return NGX_ERROR;
+        }
+
+        ngx_cpystrn(namebuf, peer->name.data, peer->name.len + 1);
+
         if (verbose) {
-            b->last = ngx_snprintf(b->last, size, "server %s weight=%d max_fails=%d fail_timeout=%d",
-                                   peer->name.data, peer->weight, peer->max_fails, peer->fail_timeout, peer->down);
+            b->last = ngx_snprintf(b->last, last - b->last, "server %s weight=%d max_fails=%d fail_timeout=%d",
+                                   namebuf, peer->weight, peer->max_fails, peer->fail_timeout, peer->down);
 
         } else {
-            b->last = ngx_snprintf(b->last, size, "server %s", peer->name.data);
+            b->last = ngx_snprintf(b->last, last - b->last, "server %s", namebuf);
 
         }
-        b->last = peer->down ? ngx_snprintf(b->last, size, " down;\n") : ngx_snprintf(b->last, size, ";\n");
+
+        b->last = peer->down ? ngx_snprintf(b->last, last - b->last, " down;\n") : ngx_snprintf(b->last, last - b->last, ";\n");
     }
+
+    return NGX_OK;
 }
 
 
@@ -176,7 +189,15 @@ ngx_dynamic_upstream_handler(ngx_http_request_t *r)
     out.buf = b;
     out.next = NULL;
 
-    ngx_dynamic_upstream_create_response_buf((ngx_http_upstream_rr_peers_t *)uscf->peer.data, b, size, op.verbose);
+    rc = ngx_dynamic_upstream_create_response_buf((ngx_http_upstream_rr_peers_t *)uscf->peer.data, b, size, op.verbose);
+
+    if (rc == NGX_ERROR) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "failed to create a response. %s:%d",
+                      __FUNCTION__,
+                      __LINE__);
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
 
     r->headers_out.status = NGX_HTTP_OK;
     r->headers_out.content_length_n = b->last - b->pos;
