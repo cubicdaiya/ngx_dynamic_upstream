@@ -24,6 +24,8 @@ static const ngx_str_t ngx_dynamic_upstream_params[] = {
 
 
 static ngx_int_t
+ngx_dynamic_upstream_is_shpool_range(ngx_http_request_t *r,ngx_slab_pool_t *shpool, void *p);
+static ngx_int_t
 ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op,
                             ngx_slab_pool_t *shpool, ngx_http_upstream_srv_conf_t *uscf);
 static ngx_int_t
@@ -32,6 +34,17 @@ ngx_dynamic_upstream_op_remove(ngx_http_request_t *r, ngx_dynamic_upstream_op_t 
 static ngx_int_t
 ngx_dynamic_upstream_op_update_param(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op,
                                      ngx_slab_pool_t *shpool, ngx_http_upstream_srv_conf_t *uscf);
+
+
+static ngx_int_t
+ngx_dynamic_upstream_is_shpool_range(ngx_http_request_t *r,ngx_slab_pool_t *shpool, void *p)
+{
+    if ((u_char *) p < shpool->start || (u_char *) p > shpool->end) {
+        return 0;
+    }
+
+    return 1;
+}
 
 
 ngx_int_t
@@ -359,7 +372,15 @@ ngx_dynamic_upstream_op_remove(ngx_http_request_t *r, ngx_dynamic_upstream_op_t 
         return NGX_ERROR;
     }
 
-    /* released removed peer */
+    /* released removed peer and attributes */
+    if (ngx_dynamic_upstream_is_shpool_range(r, shpool, target->name.data)) {
+        ngx_slab_free_locked(shpool, target->name.data);
+    }
+
+    if (ngx_dynamic_upstream_is_shpool_range(r, shpool, target->sockaddr)) {
+        ngx_slab_free_locked(shpool, target->sockaddr);
+    }
+
     ngx_slab_free_locked(shpool, target);
 
     /* found head */
