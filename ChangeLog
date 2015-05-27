@@ -1,0 +1,19 @@
+2015-05-27 Tatsuhiko Kubo <cubicdaiya@gmail.com>
+
+	* bugfix: subdued memory leaks for zone.
+
+	* bugfix: potential buffer overrun.
+
+	* added 'server' string in response.
+
+	* added testing automation with make(#2). Thanks @walf443
+
+	* specified status code of response explicitly.
+
+	* inserted various log.
+
+	* 0.1.0 released.
+
+2015-05-20 Tatsuhiko Kubo <cubicdaiya@gmail.com>
+
+	* 0.0.1 released.
