@@ -23,6 +23,8 @@ This module is significantly experimental and still under early develpment phase
 |Default|-|
 |Context|location|
 
+Now `ngx_dynamic_upstream` supports dynamic upstream under only `http` context.
+
 # Quick Start
 
 ```nginx
