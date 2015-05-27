@@ -6,7 +6,7 @@ check: tmp/$(NGINX_VERSION)/nginx-$(NGINX_VERSION)/objs/nginx install-perl-lib
 
 build: tmp/$(NGINX_VERSION)/nginx-$(NGINX_VERSION)/objs/nginx
 
-tmp/$(NGINX_VERSION)/nginx-$(NGINX_VERSION)/objs/nginx : *.c nginx-build nginx-build.ini
+tmp/$(NGINX_VERSION)/nginx-$(NGINX_VERSION)/objs/nginx : src/*.c nginx-build nginx-build.ini
 	nginx-build -verbose -v=$(NGINX_VERSION) -d tmp/ -m nginx-build.ini
 
 clean:
