@@ -6,10 +6,14 @@
 #include "ngx_dynamic_upstream_op.h"
 
 
-static ngx_http_upstream_srv_conf_t *ngx_dynamic_upstream_get_zone(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op);
-static ngx_int_t ngx_dynamic_upstream_create_response_buf(ngx_http_upstream_rr_peers_t *peers, ngx_buf_t *b, size_t size, ngx_int_t verbose);
-static ngx_int_t ngx_dynamic_upstream_handler(ngx_http_request_t *r);
-static char *ngx_dynamic_upstream(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+static ngx_http_upstream_srv_conf_t *
+ngx_dynamic_upstream_get_zone(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op);
+static ngx_int_t
+ngx_dynamic_upstream_create_response_buf(ngx_http_upstream_rr_peers_t *peers, ngx_buf_t *b, size_t size, ngx_int_t verbose);
+static ngx_int_t
+ngx_dynamic_upstream_handler(ngx_http_request_t *r);
+static char *
+ngx_dynamic_upstream(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
 
 static ngx_command_t ngx_dynamic_upstream_commands[] = {

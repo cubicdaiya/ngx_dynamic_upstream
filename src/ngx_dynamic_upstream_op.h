@@ -24,7 +24,7 @@ typedef struct ngx_dynamic_upstream_op_t {
 
 ngx_int_t ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op);
 ngx_int_t ngx_dynamic_upstream_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op,
-                                         ngx_slab_pool_t *shpool, ngx_http_upstream_srv_conf_t *uscf);
+                                  ngx_slab_pool_t *shpool, ngx_http_upstream_srv_conf_t *uscf);
 
 
 #endif /* NGX_DYNAMIC_UPSTEAM_OP_H */
