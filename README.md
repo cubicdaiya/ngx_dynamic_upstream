@@ -12,7 +12,7 @@ This directive is available in nginx-1.9.0-plus.
 
 # Status
 
-This module is significantly experimental and still under early develpment phase.
+Production ready.
 
 # Directives
 
