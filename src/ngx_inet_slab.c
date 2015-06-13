@@ -410,7 +410,7 @@ ngx_parse_inet6_url(ngx_slab_pool_t *pool, ngx_url_t *u)
     u->addrs[0].sockaddr = (struct sockaddr *) sin6;
     u->addrs[0].socklen = sizeof(struct sockaddr_in6);
 
-    p = ngx_ngx_slab_alloc(pool, u->host.len + sizeof(":65535") - 1);
+    p = ngx_slab_alloc(pool, u->host.len + sizeof(":65535") - 1);
     if (p == NULL) {
         return NGX_ERROR;
     }
@@ -521,7 +521,7 @@ ngx_inet_resolve_host_slab(ngx_slab_pool_t *pool, ngx_url_t *u)
 
         len = NGX_INET_ADDRSTRLEN + sizeof(":65535") - 1;
 
-        p = ngx_ngx_slab_alloc(pool, len);
+        p = ngx_slab_alloc(pool, len);
         if (p == NULL) {
             goto failed;
         }
@@ -554,7 +554,7 @@ ngx_inet_resolve_host_slab(ngx_slab_pool_t *pool, ngx_url_t *u)
 
         len = NGX_INET6_ADDRSTRLEN + sizeof("[]:65535") - 1;
 
-        p = ngx_ngx_slab_alloc(pool, len);
+        p = ngx_slab_alloc(pool, len);
         if (p == NULL) {
             goto failed;
         }
