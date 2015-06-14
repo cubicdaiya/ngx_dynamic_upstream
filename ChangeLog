@@ -1,3 +1,9 @@
+2015-06-14 Tatsuhiko Kubo <cubicdaiya@gmail.com>
+
+	* bugfix: fxied compilation error when `--with-ipv6` is enabled. Thanks Sergey A. Osokin for the patch.
+
+	* 0.1.1 released.
+
 2015-05-27 Tatsuhiko Kubo <cubicdaiya@gmail.com>
 
 	* bugfix: subdued memory leaks for zone.
