@@ -1,7 +1,7 @@
 NGINX_VERSION=1.9.4
 
 check: tmp/$(NGINX_VERSION)/nginx-$(NGINX_VERSION)/objs/nginx install-perl-lib
-	PERL5LIB=tmp/perl/lib/perl5/ TEST_NGINX_BINARY=tmp/$(NGINX_VERSION)/nginx-$(NGINX_VERSION)/objs/nginx \
+	PERL5LIB=tmp/perl/lib/perl5/ TEST_NGINX_BINARY=tmp/nginx/$(NGINX_VERSION)/nginx-$(NGINX_VERSION)/objs/nginx \
 	tmp/perl/bin/prove -v --shuffle --timer t/*.t
 
 build: tmp/$(NGINX_VERSION)/nginx-$(NGINX_VERSION)/objs/nginx
