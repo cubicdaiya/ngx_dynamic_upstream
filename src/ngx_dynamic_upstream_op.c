@@ -380,7 +380,6 @@ ngx_dynamic_upstream_op_remove(ngx_http_request_t *r, ngx_dynamic_upstream_op_t 
                       __LINE__);
         return NGX_ERROR;
     }
-     
     weight = target->weight;
     /* released removed peer and attributes */
     if (ngx_dynamic_upstream_is_shpool_range(r, shpool, target->name.data)) {
