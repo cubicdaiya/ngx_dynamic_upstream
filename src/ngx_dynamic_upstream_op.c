@@ -300,7 +300,6 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
                       __LINE__);
         return NGX_ERROR;
     }
-    peers->number++;
 
     last->next->name     = u.url;
     last->next->server   = u.url;
@@ -309,8 +308,12 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
 
     if (op->op_param & NGX_DYNAMIC_UPSTEAM_OP_PARAM_WEIGHT) {
         last->next->weight = op->weight;
+        last->next->effective_weight = op->weight;
+        last->next->current_weight = 0;
     } else {
         last->next->weight = 1;
+        last->next->effective_weight = 1;
+        last->next->current_weight = 0;
     }
 
     if (op->op_param & NGX_DYNAMIC_UPSTEAM_OP_PARAM_MAX_FAILS) {
@@ -329,6 +332,11 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
         last->next->down = op->down;
     }
 
+    peers->number++;
+    peers->total_weight += last->next->weight;
+    peers->single = (peers->number == 1);
+    peers->weighted = (peers->total_weight != peers->number);
+
     ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
                   "added server %s", op->server.data);
 
@@ -342,6 +350,7 @@ ngx_dynamic_upstream_op_remove(ngx_http_request_t *r, ngx_dynamic_upstream_op_t 
 {
     ngx_http_upstream_rr_peer_t   *peer, *target, *prev;
     ngx_http_upstream_rr_peers_t  *peers;
+    ngx_uint_t                     weight;
 
     peers = uscf->peer.data;
 
@@ -371,7 +380,7 @@ ngx_dynamic_upstream_op_remove(ngx_http_request_t *r, ngx_dynamic_upstream_op_t 
                       __LINE__);
         return NGX_ERROR;
     }
-
+    weight = target->weight;
     /* released removed peer and attributes */
     if (ngx_dynamic_upstream_is_shpool_range(r, shpool, target->name.data)) {
         ngx_slab_free_locked(shpool, target->name.data);
@@ -400,6 +409,9 @@ ngx_dynamic_upstream_op_remove(ngx_http_request_t *r, ngx_dynamic_upstream_op_t 
 
  ok:
     peers->number--;
+    peers->total_weight -= weight;
+    peers->single = (peers->number == 1);
+    peers->weighted = (peers->total_weight != peers->number);
 
     ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
                   "removed server %s", op->server.data);
