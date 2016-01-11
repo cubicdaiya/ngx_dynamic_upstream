@@ -85,16 +85,7 @@ ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
 
         if (!var->not_found) {
             if (ngx_strcmp("arg_upstream", args[i].data) == 0) {
-                op->upstream.data = ngx_palloc(r->pool, var->len + 1);
-                if (op->upstream.data == NULL) {
-                    op->status = NGX_HTTP_INTERNAL_SERVER_ERROR;
-                    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                                  "failed to allocate memory from r->pool %s:%d",
-                                  __FUNCTION__,
-                                  __LINE__);
-                    return NGX_ERROR;
-                }
-                ngx_cpystrn(op->upstream.data, var->data, var->len + 1);
+                op->upstream.data = var->data;
                 op->upstream.len = var->len;
 
             } else if (ngx_strcmp("arg_verbose", args[i].data) == 0) {
@@ -110,16 +101,7 @@ ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
                 op->backup = 1;
 
             } else if (ngx_strcmp("arg_server", args[i].data) == 0) {
-                op->server.data = ngx_palloc(r->pool, var->len + 1);
-                if (op->server.data == NULL) {
-                    op->status = NGX_HTTP_INTERNAL_SERVER_ERROR;
-                    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                                  "failed to allocate memory from r->pool %s:%d",
-                                  __FUNCTION__,
-                                  __LINE__);
-                    return NGX_ERROR;
-                }
-                ngx_cpystrn(op->server.data, var->data, var->len + 1);
+                op->server.data = var->data;
                 op->server.len = var->len;
 
             } else if (ngx_strcmp("arg_weight", args[i].data) == 0) {
@@ -257,8 +239,8 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
         if (op->server.len == peer->name.len && ngx_strncmp(op->server.data, peer->name.data, peer->name.len) == 0) {
             op->status = NGX_HTTP_BAD_REQUEST;
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "server %s already exists in upstream. %s:%d",
-                          op->server.data,
+                          "server %V already exists in upstream. %s:%d",
+                          &op->server,
                           __FUNCTION__,
                           __LINE__);
             return NGX_ERROR;
@@ -338,7 +320,7 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
     peers->weighted = (peers->total_weight != peers->number);
 
     ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
-                  "added server %s", op->server.data);
+                  "added server %V", &op->server);
 
     return NGX_OK;
 }
@@ -374,8 +356,8 @@ ngx_dynamic_upstream_op_remove(ngx_http_request_t *r, ngx_dynamic_upstream_op_t 
     if (target == NULL) {
         op->status = NGX_HTTP_BAD_REQUEST;
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "server %s is not found. %s:%d",
-                      op->server.data,
+                      "server %V is not found. %s:%d",
+                      &op->server,
                       __FUNCTION__,
                       __LINE__);
         return NGX_ERROR;
@@ -414,7 +396,7 @@ ngx_dynamic_upstream_op_remove(ngx_http_request_t *r, ngx_dynamic_upstream_op_t 
     peers->weighted = (peers->total_weight != peers->number);
 
     ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
-                  "removed server %s", op->server.data);
+                  "removed server %V", &op->server);
 
     return NGX_OK;
 }
@@ -440,8 +422,8 @@ ngx_dynamic_upstream_op_update_param(ngx_http_request_t *r, ngx_dynamic_upstream
     if (target == NULL) {
         op->status = NGX_HTTP_BAD_REQUEST;
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "server %s is not found. %s:%d",
-                      op->server.data,
+                      "server %V is not found. %s:%d",
+                      &op->server,
                       __FUNCTION__,
                       __LINE__);
         return NGX_ERROR;
@@ -464,13 +446,13 @@ ngx_dynamic_upstream_op_update_param(ngx_http_request_t *r, ngx_dynamic_upstream
     if (op->op_param & NGX_DYNAMIC_UPSTEAM_OP_PARAM_UP) {
         target->down = 0;
         ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
-                      "downed server %s", op->server.data);
+                      "downed server %V", &op->server);
     }
 
     if (op->op_param & NGX_DYNAMIC_UPSTEAM_OP_PARAM_DOWN) {
         target->down = 1;
         ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
-                      "upped server %s", op->server.data);
+                      "upped server %V", &op->server);
     }
 
     return NGX_OK;
