@@ -462,11 +462,11 @@ ngx_inet_resolve_host_slab(ngx_slab_pool_t *pool, ngx_url_t *u)
 
     if (getaddrinfo((char *) host, NULL, &hints, &res) != 0) {
         u->err = "host not found";
-        ngx_free(host);
+        ngx_slab_free_locked(pool, host);
         return NGX_ERROR;
     }
 
-    ngx_free(host);
+    ngx_slab_free_locked(pool, host);
 
     for (i = 0, rp = res; rp != NULL; rp = rp->ai_next) {
 
@@ -606,7 +606,7 @@ ngx_inet_resolve_host_slab(ngx_slab_pool_t *pool, ngx_url_t *u)
 
         h = gethostbyname((char *) host);
 
-        ngx_free(host);
+        ngx_slab_free_locked(pool, host);
 
         if (h == NULL || h->h_addr_list[0] == NULL) {
             u->err = "host not found";
