@@ -1,3 +1,13 @@
+2016-01-17 Tatsuhiko Kubo <cubicdaiya@gmail.com>
+
+	* bugfix: fixed memory corruptions. (#10) Thanks @igorastds
+
+	* optimize: reduced memory allocations. (#8) Thanks @flygoast
+
+	* supported round_robin load balancing for op_add and op_remove. (#6) Thanks @wangfakang
+
+	* 0.1.2 released.
+
 2015-06-14 Tatsuhiko Kubo <cubicdaiya@gmail.com>
 
 	* bugfix: fxied compilation error when `--with-ipv6` is enabled. Thanks Sergey A. Osokin for the patch.
