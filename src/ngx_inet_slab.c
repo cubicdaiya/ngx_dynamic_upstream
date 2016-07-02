@@ -413,8 +413,11 @@ ngx_parse_inet6_url(ngx_slab_pool_t *pool, ngx_url_t *u)
         return NGX_ERROR;
     }
 
+#if (nginx_version < 1011000)
     ngx_memcpy(sin6, u->sockaddr, sizeof(struct sockaddr_in6));
-
+#else
+    ngx_memcpy(sin6, &u->sockaddr, sizeof(struct sockaddr_in6));
+#endif
     u->addrs[0].sockaddr = (struct sockaddr *) sin6;
     u->addrs[0].socklen = sizeof(struct sockaddr_in6);
 
