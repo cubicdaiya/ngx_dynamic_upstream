@@ -206,6 +206,8 @@ ngx_dynamic_upstream_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op,
 
     rc = NGX_OK;
 
+    ngx_shmtx_lock(&shpool->mutex);
+
     switch (op->op) {
     case NGX_DYNAMIC_UPSTEAM_OP_ADD:
         rc = ngx_dynamic_upstream_op_add(r, op, shpool, uscf);
@@ -226,9 +228,24 @@ ngx_dynamic_upstream_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op,
         break;
     }
 
+    ngx_shmtx_unlock(&shpool->mutex);
+
     return rc;
 }
 
+#define lock_peers(primary) { \
+    ngx_http_upstream_rr_peers_wlock(primary); \
+    if (primary->next) { \
+        ngx_http_upstream_rr_peers_wlock(primary->next); \
+    } \
+}
+
+#define unlock_peers(primary) { \
+    if (primary->next) { \
+        ngx_http_upstream_rr_peers_unlock(primary->next); \
+    } \
+    ngx_http_upstream_rr_peers_unlock(primary); \
+}
 
 static ngx_int_t
 ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op,
@@ -239,6 +256,9 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
     ngx_url_t                      u;
 
     primary = uscf->peer.data;
+
+    lock_peers(primary);
+
     backup = primary->next;
 
     for (peers = primary; peers; peers = peers->next) {
@@ -250,6 +270,7 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
                               &op->server,
                               __FUNCTION__,
                               __LINE__);
+                unlock_peers(primary);
                 return NGX_ERROR;
             }
             if ( (op->backup == 0 && peers == primary) || (op->backup == 1 && peers == backup) ) {
@@ -268,6 +289,7 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
                               "failed to allocate memory from slab %s:%d",
                               __FUNCTION__,
                               __LINE__);
+                unlock_peers(primary);
                 return NGX_ERROR;
             }
             backup->shpool = primary->shpool;
@@ -292,6 +314,7 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
                       "failed to allocate memory from slab %s:%d",
                       __FUNCTION__,
                       __LINE__);
+        unlock_peers(primary);
         return NGX_ERROR;
     }
     ngx_cpystrn(u.url.data, op->server.data, op->server.len + 1);
@@ -307,6 +330,7 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
             ngx_slab_free_locked(shpool, backup);
         }
         op->status = NGX_HTTP_INTERNAL_SERVER_ERROR;
+        unlock_peers(primary);
         return NGX_ERROR;
     }
 
@@ -320,6 +344,7 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
                       "failed to allocate memory from slab %s:%d",
                       __FUNCTION__,
                       __LINE__);
+        unlock_peers(primary);
         return NGX_ERROR;
     }
 
@@ -367,7 +392,10 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
 
     if (backup && primary->next == NULL) {
         primary->next = backup;
+        ngx_http_upstream_rr_peers_wlock(backup);
     }
+
+    unlock_peers(primary);
 
     ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
                   "added server %V", &op->server);
@@ -385,6 +413,9 @@ ngx_dynamic_upstream_op_remove(ngx_http_request_t *r, ngx_dynamic_upstream_op_t 
     ngx_uint_t                     weight;
 
     primary = uscf->peer.data;
+
+    lock_peers(primary);
+
     backup = primary->next;
 
     target = NULL;
@@ -394,6 +425,7 @@ ngx_dynamic_upstream_op_remove(ngx_http_request_t *r, ngx_dynamic_upstream_op_t 
            if (op->server.len == peer->name.len && ngx_strncmp(op->server.data, peer->name.data, peer->name.len) == 0) {
                if (peers == primary && peers->number == 1) {
                   op->status = NGX_HTTP_BAD_REQUEST;
+                  unlock_peers(primary);
                   return NGX_ERROR;
                }
                target = peer;
@@ -414,6 +446,7 @@ c:
                       &op->server,
                       __FUNCTION__,
                       __LINE__);
+        unlock_peers(primary);
         return NGX_ERROR;
     }
     weight = target->weight;
@@ -452,8 +485,11 @@ c:
     if (peers->number == 0) {
         assert(peers == backup);
         primary->next = NULL;
+        ngx_http_upstream_rr_peers_unlock(backup);
         ngx_slab_free_locked(shpool, backup);
     }
+
+    unlock_peers(primary);
 
     ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
                   "removed server %V", &op->server);
@@ -467,15 +503,19 @@ ngx_dynamic_upstream_op_update_param(ngx_http_request_t *r, ngx_dynamic_upstream
                                      ngx_slab_pool_t *shpool, ngx_http_upstream_srv_conf_t *uscf)
 {
     ngx_http_upstream_rr_peer_t   *peer, *target;
-    ngx_http_upstream_rr_peers_t  *peers;
+    ngx_http_upstream_rr_peers_t  *peers, *primary;
 
-    peers = uscf->peer.data;
+    primary = uscf->peer.data;
+
+    lock_peers(primary);
 
     target = NULL;
-    for (peer = peers->peer; peer ; peer = peer->next) {
-        if (op->server.len == peer->name.len && ngx_strncmp(op->server.data, peer->name.data, peer->name.len) == 0) {
-            target = peer;
-            break;
+    for (peers = primary; peers; peers = peers->next) {
+        for (peer = peers->peer; peer ; peer = peer->next) {
+            if (op->server.len == peer->name.len && ngx_strncmp(op->server.data, peer->name.data, peer->name.len) == 0) {
+                target = peer;
+                break;
+            }
         }
     }
 
@@ -486,6 +526,7 @@ ngx_dynamic_upstream_op_update_param(ngx_http_request_t *r, ngx_dynamic_upstream
                       &op->server,
                       __FUNCTION__,
                       __LINE__);
+        unlock_peers(primary)
         return NGX_ERROR;
     }
 
@@ -514,6 +555,8 @@ ngx_dynamic_upstream_op_update_param(ngx_http_request_t *r, ngx_dynamic_upstream
         ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
                       "upped server %V", &op->server);
     }
+
+    unlock_peers(primary)
 
     return NGX_OK;
 }

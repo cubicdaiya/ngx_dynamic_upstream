@@ -170,7 +170,6 @@ ngx_dynamic_upstream_handler(ngx_http_request_t *r)
     }
 
     shpool = (ngx_slab_pool_t *) uscf->shm_zone->shm.addr;
-    ngx_shmtx_lock(&shpool->mutex);
     
     rc = ngx_dynamic_upstream_op(r, &op, shpool, uscf);
     if (rc != NGX_OK) {
@@ -180,8 +179,6 @@ ngx_dynamic_upstream_handler(ngx_http_request_t *r)
         }
         return op.status;
     }
-
-    ngx_shmtx_unlock(&shpool->mutex);
 
     size = uscf->shm_zone->shm.size;
 
