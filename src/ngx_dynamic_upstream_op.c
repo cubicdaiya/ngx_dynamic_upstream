@@ -4,6 +4,9 @@
 #include <ngx_http.h>
 
 
+#include <assert.h>
+
+
 #include "ngx_dynamic_upstream_module.h"
 #include "ngx_inet_slab.h"
 
@@ -98,8 +101,9 @@ ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
                 op->op |= NGX_DYNAMIC_UPSTEAM_OP_REMOVE;
 
             } else if (ngx_strcmp("arg_backup", args[i].data) == 0) {
-                op->backup = 1;
-
+                op->backup = ngx_atoi(var->data, var->len);
+                op->op |= NGX_DYNAMIC_UPSTEAM_OP_PARAM;
+                op->op_param |= NGX_DYNAMIC_UPSTEAM_OP_BACKUP;
             } else if (ngx_strcmp("arg_server", args[i].data) == 0) {
                 op->server.data = var->data;
                 op->server.len = var->len;
@@ -230,28 +234,59 @@ static ngx_int_t
 ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op,
                             ngx_slab_pool_t *shpool, ngx_http_upstream_srv_conf_t *uscf)
 {
-    ngx_http_upstream_rr_peer_t   *peer, *last;
-    ngx_http_upstream_rr_peers_t  *peers;
+    ngx_http_upstream_rr_peer_t   *peer, *last = NULL, *new_peer;
+    ngx_http_upstream_rr_peers_t  *peers, *primary, *backup;
     ngx_url_t                      u;
 
-    peers = uscf->peer.data;
-    for (peer = peers->peer, last = peer; peer; peer = peer->next) {
-        if (op->server.len == peer->name.len && ngx_strncmp(op->server.data, peer->name.data, peer->name.len) == 0) {
-            op->status = NGX_HTTP_BAD_REQUEST;
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "server %V already exists in upstream. %s:%d",
-                          &op->server,
-                          __FUNCTION__,
-                          __LINE__);
-            return NGX_ERROR;
+    primary = uscf->peer.data;
+    backup = primary->next;
+
+    for (peers = primary; peers; peers = peers->next) {
+        for (peer = peers->peer; peer; peer = peer->next) {
+            if (op->server.len == peer->name.len && ngx_strncmp(op->server.data, peer->name.data, peer->name.len) == 0) {
+                op->status = NGX_HTTP_BAD_REQUEST;
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                              "server %V already exists in upstream. %s:%d",
+                              &op->server,
+                              __FUNCTION__,
+                              __LINE__);
+                return NGX_ERROR;
+            }
+            if ( (op->backup == 0 && peers == primary) || (op->backup == 1 && peers == backup) ) {
+                last = peer;
+            }
         }
-        last = peer;
+    }
+
+    if (op->backup) {
+        if (backup == NULL) {
+            assert(last == NULL);
+            backup = ngx_slab_calloc_locked(shpool, sizeof(ngx_http_upstream_rr_peers_t));
+            if (backup == NULL) {
+                op->status = NGX_HTTP_INTERNAL_SERVER_ERROR;
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                              "failed to allocate memory from slab %s:%d",
+                              __FUNCTION__,
+                              __LINE__);
+                return NGX_ERROR;
+            }
+            backup->shpool = primary->shpool;
+            backup->rwlock = primary->rwlock;
+            backup->name = primary->name;
+        }
+
+        peers = backup;
+    } else {
+        peers = primary;
     }
 
     ngx_memzero(&u, sizeof(ngx_url_t));
 
     u.url.data = ngx_slab_alloc_locked(shpool, op->server.len);
     if (u.url.data == NULL) {
+        if (backup && primary->next == NULL) {
+            ngx_slab_free_locked(shpool, backup);
+        }
         op->status = NGX_HTTP_INTERNAL_SERVER_ERROR;
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "failed to allocate memory from slab %s:%d",
@@ -268,13 +303,18 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                           "%s in upstream \"%V\"", u.err, &u.url);
         }
-
+        if (backup && primary->next == NULL) {
+            ngx_slab_free_locked(shpool, backup);
+        }
         op->status = NGX_HTTP_INTERNAL_SERVER_ERROR;
         return NGX_ERROR;
     }
 
-    last->next = ngx_slab_calloc_locked(shpool, sizeof(ngx_http_upstream_rr_peer_t));
-    if (last->next == NULL) {
+    new_peer = ngx_slab_calloc_locked(shpool, sizeof(ngx_http_upstream_rr_peer_t));
+    if (new_peer == NULL) {
+        if (backup && primary->next == NULL) {
+            ngx_slab_free_locked(shpool, backup);
+        }
         op->status = NGX_HTTP_INTERNAL_SERVER_ERROR;
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "failed to allocate memory from slab %s:%d",
@@ -283,41 +323,51 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
         return NGX_ERROR;
     }
 
-    last->next->name     = u.url;
-    last->next->server   = u.url;
-    last->next->sockaddr = u.addrs[0].sockaddr;
-    last->next->socklen  = u.addrs[0].socklen;
+    new_peer->name     = u.url;
+    new_peer->server   = u.url;
+    new_peer->sockaddr = u.addrs[0].sockaddr;
+    new_peer->socklen  = u.addrs[0].socklen;
 
     if (op->op_param & NGX_DYNAMIC_UPSTEAM_OP_PARAM_WEIGHT) {
-        last->next->weight = op->weight;
-        last->next->effective_weight = op->weight;
-        last->next->current_weight = 0;
+        new_peer->weight = op->weight;
+        new_peer->effective_weight = op->weight;
+        new_peer->current_weight = 0;
     } else {
-        last->next->weight = 1;
-        last->next->effective_weight = 1;
-        last->next->current_weight = 0;
+        new_peer->weight = 1;
+        new_peer->effective_weight = 1;
+        new_peer->current_weight = 0;
     }
 
     if (op->op_param & NGX_DYNAMIC_UPSTEAM_OP_PARAM_MAX_FAILS) {
-        last->next->max_fails = op->max_fails;
+        new_peer->max_fails = op->max_fails;
     } else {
-        last->next->max_fails = 1;
+        new_peer->max_fails = 1;
     }
 
     if (op->op_param & NGX_DYNAMIC_UPSTEAM_OP_PARAM_FAIL_TIMEOUT) {
-        last->next->fail_timeout = op->fail_timeout;
+        new_peer->fail_timeout = op->fail_timeout;
     } else {
-        last->next->fail_timeout = 10;
+        new_peer->fail_timeout = 10;
     }
 
     if (op->op_param & NGX_DYNAMIC_UPSTEAM_OP_PARAM_DOWN) {
-        last->next->down = op->down;
+        new_peer->down = op->down;
     }
 
-    peers->number++;
-    peers->total_weight += last->next->weight;
+    if (last == NULL) {
+        peers->peer = new_peer;
+    } else {
+        last->next = new_peer;
+    }
+
+    peers->total_weight += new_peer->weight;
     peers->single = (peers->number == 1);
     peers->weighted = (peers->total_weight != peers->number);
+    peers->number++;
+
+    if (backup && primary->next == NULL) {
+        primary->next = backup;
+    }
 
     ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
                   "added server %V", &op->server);
@@ -331,26 +381,30 @@ ngx_dynamic_upstream_op_remove(ngx_http_request_t *r, ngx_dynamic_upstream_op_t 
                                ngx_slab_pool_t *shpool, ngx_http_upstream_srv_conf_t *uscf)
 {
     ngx_http_upstream_rr_peer_t   *peer, *target, *prev;
-    ngx_http_upstream_rr_peers_t  *peers;
+    ngx_http_upstream_rr_peers_t  *peers, *primary, *backup;
     ngx_uint_t                     weight;
 
-    peers = uscf->peer.data;
-
-    if (peers->number < 2) {
-        op->status = NGX_HTTP_BAD_REQUEST;
-        return NGX_ERROR;
-    }
+    primary = uscf->peer.data;
+    backup = primary->next;
 
     target = NULL;
-    prev = NULL;
-    for (peer = peers->peer; peer ; peer = peer->next) {
-        if (op->server.len == peer->name.len && ngx_strncmp(op->server.data, peer->name.data, peer->name.len) == 0) {
-            target = peer;
-            peer = peer->next;
-            break;
+    for (peers = primary; peers; peers = peers->next) {
+       prev = NULL;
+       for (peer = peers->peer; peer; peer = peer->next) {
+           if (op->server.len == peer->name.len && ngx_strncmp(op->server.data, peer->name.data, peer->name.len) == 0) {
+               if (peers == primary && peers->number == 1) {
+                  op->status = NGX_HTTP_BAD_REQUEST;
+                  return NGX_ERROR;
+               }
+               target = peer;
+               peer = peer->next;
+               goto c;
+            }
+            prev = peer;
         }
-        prev = peer;
     }
+
+c:
 
     /* not found */
     if (target == NULL) {
@@ -394,6 +448,12 @@ ngx_dynamic_upstream_op_remove(ngx_http_request_t *r, ngx_dynamic_upstream_op_t 
     peers->total_weight -= weight;
     peers->single = (peers->number == 1);
     peers->weighted = (peers->total_weight != peers->number);
+
+    if (peers->number == 0) {
+        assert(peers == backup);
+        primary->next = NULL;
+        ngx_slab_free_locked(shpool, backup);
+    }
 
     ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
                   "removed server %V", &op->server);
