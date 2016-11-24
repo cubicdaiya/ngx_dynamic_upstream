@@ -241,7 +241,7 @@ ngx_dynamic_upstream_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op,
 }
 
 #define unlock_peers(primary) { \
-    if (primary->next) { \
+    if (primary->next && primary->next->rwlock) { \
         ngx_http_upstream_rr_peers_unlock(primary->next); \
     } \
     ngx_http_upstream_rr_peers_unlock(primary); \
@@ -293,7 +293,6 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
                 return NGX_ERROR;
             }
             backup->shpool = primary->shpool;
-            backup->rwlock = primary->rwlock;
             backup->name = primary->name;
         }
 
@@ -386,13 +385,12 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
     }
 
     peers->total_weight += new_peer->weight;
-    peers->single = (peers->number == 1);
+    peers->single = (peers->number == 0);
     peers->weighted = (peers->total_weight != peers->number);
     peers->number++;
 
     if (backup && primary->next == NULL) {
         primary->next = backup;
-        ngx_http_upstream_rr_peers_wlock(backup);
     }
 
     unlock_peers(primary);
@@ -485,7 +483,6 @@ c:
     if (peers->number == 0) {
         assert(peers == backup);
         primary->next = NULL;
-        ngx_http_upstream_rr_peers_unlock(backup);
         ngx_slab_free_locked(shpool, backup);
     }
 
