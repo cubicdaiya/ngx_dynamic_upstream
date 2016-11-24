@@ -8,8 +8,12 @@
 
 static ngx_http_upstream_srv_conf_t *
 ngx_dynamic_upstream_get_zone(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op);
+static ngx_stream_upstream_srv_conf_t *
+ngx_dynamic_upstream_stream_get_zone(ngx_dynamic_upstream_op_t *op);
 static ngx_int_t
 ngx_dynamic_upstream_create_response_buf(ngx_http_upstream_rr_peers_t *peers, ngx_buf_t *b, size_t size, ngx_int_t verbose);
+static ngx_int_t
+ngx_dynamic_upstream_stream_create_response_buf(ngx_stream_upstream_rr_peers_t *peers, ngx_buf_t *b, size_t size, ngx_int_t verbose);
 static ngx_int_t
 ngx_dynamic_upstream_handler(ngx_http_request_t *r);
 static char *
@@ -69,6 +73,36 @@ ngx_dynamic_upstream_get_zone(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
     ngx_http_upstream_main_conf_t  *umcf;
 
     umcf  = ngx_http_get_module_main_conf(r, ngx_http_upstream_module);
+    if (umcf == NULL) {
+        return NULL;
+    }
+    uscfp = umcf->upstreams.elts;
+
+    for (i = 0; i < umcf->upstreams.nelts; i++) {
+        uscf = uscfp[i];
+        if (uscf->shm_zone != NULL &&
+            uscf->shm_zone->shm.name.len == op->upstream.len &&
+            ngx_strncmp(uscf->shm_zone->shm.name.data, op->upstream.data, op->upstream.len) == 0)
+        {
+            return uscf;
+        }
+    }
+
+    return NULL;
+}
+
+
+static ngx_stream_upstream_srv_conf_t *
+ngx_dynamic_upstream_stream_get_zone(ngx_dynamic_upstream_op_t *op)
+{
+    ngx_uint_t                      i;
+    ngx_stream_upstream_srv_conf_t   *uscf, **uscfp;
+    ngx_stream_upstream_main_conf_t  *umcf;
+
+    umcf  = ngx_stream_cycle_get_module_main_conf(ngx_cycle, ngx_stream_upstream_module);
+    if (umcf == NULL) {
+        return NULL;
+    }
     uscfp = umcf->upstreams.elts;
 
     for (i = 0; i < umcf->upstreams.nelts; i++) {
@@ -89,7 +123,7 @@ static ngx_int_t
 ngx_dynamic_upstream_create_response_buf(ngx_http_upstream_rr_peers_t *peers, ngx_buf_t *b, size_t size, ngx_int_t verbose)
 {
     ngx_http_upstream_rr_peer_t  *peer;
-    ngx_http_upstream_rr_peers_t  *primary, *backup;
+    ngx_http_upstream_rr_peers_t *primary, *backup;
     u_char                        namebuf[512], *last;
 
     primary = peers;
@@ -132,6 +166,58 @@ ngx_dynamic_upstream_create_response_buf(ngx_http_upstream_rr_peers_t *peers, ng
 
 
 static ngx_int_t
+ngx_dynamic_upstream_stream_create_response_buf(ngx_stream_upstream_rr_peers_t *peers, ngx_buf_t *b, size_t size, ngx_int_t verbose)
+{
+    ngx_stream_upstream_rr_peer_t  *peer;
+    ngx_stream_upstream_rr_peers_t *primary, *backup;
+    u_char                          namebuf[512], *last;
+
+    primary = peers;
+
+    lock_peers(primary);
+
+    backup = primary->next;
+
+    last = b->last + size;
+
+    for (; peers; peers = peers->next) {
+        for (peer = peers->peer; peer; peer = peer->next) {
+
+            if (peer->name.len > 511) {
+                unlock_peers(primary);
+                return NGX_ERROR;
+            }
+
+            ngx_cpystrn(namebuf, peer->name.data, peer->name.len + 1);
+
+            if (verbose) {
+                b->last = ngx_snprintf(b->last, last - b->last, "server %s weight=%d max_fails=%d fail_timeout=%d",
+                                       namebuf, peer->weight, peer->max_fails, peer->fail_timeout, peer->down);
+
+            } else {
+                b->last = ngx_snprintf(b->last, last - b->last, "server %s", namebuf);
+
+            }
+
+            b->last = peer->down ? ngx_snprintf(b->last, last - b->last, " down") : ngx_snprintf(b->last, last - b->last, "");
+            b->last = peers == backup ? ngx_snprintf(b->last, last - b->last, " backup;\n") : ngx_snprintf(b->last, last - b->last, ";\n");
+
+        }
+    }
+
+    unlock_peers(primary);
+
+    return NGX_OK;
+}
+
+
+typedef struct {
+    ngx_http_upstream_srv_conf_t *http;
+    ngx_stream_upstream_srv_conf_t *stream;
+} ngx_upstream_srv_conf_t;
+
+
+static ngx_int_t
 ngx_dynamic_upstream_handler(ngx_http_request_t *r)
 {
     size_t                          size;
@@ -139,8 +225,9 @@ ngx_dynamic_upstream_handler(ngx_http_request_t *r)
     ngx_chain_t                     out;
     ngx_dynamic_upstream_op_t       op;
     ngx_buf_t                      *b;
-    ngx_http_upstream_srv_conf_t   *uscf;
-    ngx_slab_pool_t                *shpool;
+    ngx_upstream_srv_conf_t         uscf;
+
+    ngx_memzero(&uscf, sizeof(ngx_upstream_srv_conf_t));
 
     if (r->method != NGX_HTTP_GET && r->method != NGX_HTTP_HEAD) {
         return NGX_HTTP_NOT_ALLOWED;
@@ -174,8 +261,13 @@ ngx_dynamic_upstream_handler(ngx_http_request_t *r)
         return op.status;
     }
 
-    uscf = ngx_dynamic_upstream_get_zone(r, &op);
-    if (uscf == NULL) {
+    if (op.op_param & NGX_DYNAMIC_UPSTEAM_OP_PARAM_STREAM) {
+        uscf.stream = ngx_dynamic_upstream_stream_get_zone(&op);
+    } else {
+        uscf.http = ngx_dynamic_upstream_get_zone(r, &op);
+    }
+
+    if (uscf.stream == NULL && uscf.http == NULL) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "upstream is not found. %s:%d",
                       __FUNCTION__,
@@ -183,9 +275,14 @@ ngx_dynamic_upstream_handler(ngx_http_request_t *r)
         return NGX_HTTP_NOT_FOUND;
     }
 
-    shpool = (ngx_slab_pool_t *) uscf->shm_zone->shm.addr;
+    if (uscf.stream) {
+        rc = ngx_dynamic_upstream_stream_op(r->connection->log, &op, uscf.stream);
+        size = uscf.stream->shm_zone->shm.size;
+    } else {
+        rc = ngx_dynamic_upstream_op(r->connection->log, &op, uscf.http);
+        size = uscf.http->shm_zone->shm.size;
+    }
 
-    rc = ngx_dynamic_upstream_op(r, &op, shpool, uscf);
     if (rc != NGX_OK) {
         if (op.status == NGX_HTTP_OK) {
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
@@ -193,7 +290,6 @@ ngx_dynamic_upstream_handler(ngx_http_request_t *r)
         return op.status;
     }
 
-    size = uscf->shm_zone->shm.size;
 
     b = ngx_create_temp_buf(r->pool, size);
     if (b == NULL) {
@@ -203,7 +299,8 @@ ngx_dynamic_upstream_handler(ngx_http_request_t *r)
     out.buf = b;
     out.next = NULL;
 
-    rc = ngx_dynamic_upstream_create_response_buf((ngx_http_upstream_rr_peers_t *)uscf->peer.data, b, size, op.verbose);
+    rc = uscf.stream ? ngx_dynamic_upstream_stream_create_response_buf(uscf.stream->peer.data, b, size, op.verbose)
+                     : ngx_dynamic_upstream_create_response_buf(uscf.http->peer.data, b, size, op.verbose);
 
     if (rc == NGX_ERROR) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
@@ -238,4 +335,22 @@ ngx_dynamic_upstream(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     clcf->handler = ngx_dynamic_upstream_handler;
 
     return NGX_CONF_OK;
+}
+
+
+ngx_int_t
+ngx_dynamic_upstream_op(ngx_log_t *log, ngx_dynamic_upstream_op_t *op, ngx_http_upstream_srv_conf_t *uscf)
+{
+    ngx_upstream_rr_peers_t peers;
+    peers.http = uscf->peer.data;
+    return ngx_dynamic_upstream_op_impl(log, op, (ngx_slab_pool_t*) uscf->shm_zone->shm.addr, &peers);
+}
+
+
+ngx_int_t
+ngx_dynamic_upstream_stream_op(ngx_log_t *log, ngx_dynamic_upstream_op_t *op, ngx_stream_upstream_srv_conf_t *uscf)
+{
+    ngx_upstream_rr_peers_t peers;
+    peers.stream = uscf->peer.data;
+    return ngx_dynamic_upstream_op_impl(log, op, (ngx_slab_pool_t*) uscf->shm_zone->shm.addr, &peers);
 }
