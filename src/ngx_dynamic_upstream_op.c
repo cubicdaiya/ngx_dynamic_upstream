@@ -101,9 +101,8 @@ ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
                 op->op |= NGX_DYNAMIC_UPSTEAM_OP_REMOVE;
 
             } else if (ngx_strcmp("arg_backup", args[i].data) == 0) {
-                op->backup = ngx_atoi(var->data, var->len);
-                op->op |= NGX_DYNAMIC_UPSTEAM_OP_PARAM;
-                op->op_param |= NGX_DYNAMIC_UPSTEAM_OP_BACKUP;
+                op->backup = 1;
+
             } else if (ngx_strcmp("arg_server", args[i].data) == 0) {
                 op->server.data = var->data;
                 op->server.len = var->len;
@@ -161,7 +160,7 @@ ngx_dynamic_upstream_build_op(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
                 op->op |= NGX_DYNAMIC_UPSTEAM_OP_PARAM;
                 op->op_param |= NGX_DYNAMIC_UPSTEAM_OP_PARAM_DOWN;
                 op->verbose = 1;
-                
+
             }
         }
     }
