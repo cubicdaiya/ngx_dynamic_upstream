@@ -82,7 +82,7 @@ ngx_dynamic_upstream_get_zone(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *
     }
 
     return NULL;
-}    
+}
 
 
 static ngx_int_t
@@ -141,7 +141,7 @@ ngx_dynamic_upstream_handler(ngx_http_request_t *r)
     ngx_buf_t                      *b;
     ngx_http_upstream_srv_conf_t   *uscf;
     ngx_slab_pool_t                *shpool;
-    
+
     if (r->method != NGX_HTTP_GET && r->method != NGX_HTTP_HEAD) {
         return NGX_HTTP_NOT_ALLOWED;
     }
@@ -173,7 +173,7 @@ ngx_dynamic_upstream_handler(ngx_http_request_t *r)
         }
         return op.status;
     }
-    
+
     uscf = ngx_dynamic_upstream_get_zone(r, &op);
     if (uscf == NULL) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
@@ -184,10 +184,9 @@ ngx_dynamic_upstream_handler(ngx_http_request_t *r)
     }
 
     shpool = (ngx_slab_pool_t *) uscf->shm_zone->shm.addr;
-    
+
     rc = ngx_dynamic_upstream_op(r, &op, shpool, uscf);
     if (rc != NGX_OK) {
-        ngx_shmtx_unlock(&shpool->mutex);
         if (op.status == NGX_HTTP_OK) {
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
