@@ -82,3 +82,21 @@ server 127.0.0.1:6003;
     GET /dynamic?upstream=zone_for_backends&server=127.0.0.1:6004&remove=
 --- response_body_like: 400 Bad Request
 --- error_code: 400
+
+=== TEST 5: remove backup
+--- http_config
+    upstream backends {
+        zone zone_for_backends 128k;
+        server 127.0.0.1:6001;
+        server 127.0.0.1:6002;
+        server 127.0.0.1:6003 backup;
+    }
+--- config
+    location /dynamic {
+        dynamic_upstream;
+    }
+--- request
+    GET /dynamic?upstream=zone_for_backends&server=127.0.0.1:6003&remove=
+--- response_body
+server 127.0.0.1:6001;
+server 127.0.0.1:6002;

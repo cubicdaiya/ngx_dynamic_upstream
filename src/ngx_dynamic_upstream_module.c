@@ -3,8 +3,8 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
+#include "ngx_dynamic_upstream_module.h"
 #include "ngx_dynamic_upstream_op.h"
-
 
 static ngx_http_upstream_srv_conf_t *
 ngx_dynamic_upstream_get_zone(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op);
@@ -89,29 +89,43 @@ static ngx_int_t
 ngx_dynamic_upstream_create_response_buf(ngx_http_upstream_rr_peers_t *peers, ngx_buf_t *b, size_t size, ngx_int_t verbose)
 {
     ngx_http_upstream_rr_peer_t  *peer;
+    ngx_http_upstream_rr_peers_t  *primary, *backup;
     u_char                        namebuf[512], *last;
+
+    primary = peers;
+
+    lock_peers(primary);
+
+    backup = primary->next;
 
     last = b->last + size;
 
-    for (peer = peers->peer; peer; peer = peer->next) {
+    for (; peers; peers = peers->next) {
+        for (peer = peers->peer; peer; peer = peer->next) {
 
-        if (peer->name.len > 511) {
-            return NGX_ERROR;
+            if (peer->name.len > 511) {
+                unlock_peers(primary);
+                return NGX_ERROR;
+            }
+
+            ngx_cpystrn(namebuf, peer->name.data, peer->name.len + 1);
+
+            if (verbose) {
+                b->last = ngx_snprintf(b->last, last - b->last, "server %s weight=%d max_fails=%d fail_timeout=%d",
+                                       namebuf, peer->weight, peer->max_fails, peer->fail_timeout, peer->down);
+
+            } else {
+                b->last = ngx_snprintf(b->last, last - b->last, "server %s", namebuf);
+
+            }
+
+            b->last = peer->down ? ngx_snprintf(b->last, last - b->last, " down") : ngx_snprintf(b->last, last - b->last, "");
+            b->last = peers == backup ? ngx_snprintf(b->last, last - b->last, " backup;\n") : ngx_snprintf(b->last, last - b->last, ";\n");
+
         }
-
-        ngx_cpystrn(namebuf, peer->name.data, peer->name.len + 1);
-
-        if (verbose) {
-            b->last = ngx_snprintf(b->last, last - b->last, "server %s weight=%d max_fails=%d fail_timeout=%d",
-                                   namebuf, peer->weight, peer->max_fails, peer->fail_timeout, peer->down);
-
-        } else {
-            b->last = ngx_snprintf(b->last, last - b->last, "server %s", namebuf);
-
-        }
-
-        b->last = peer->down ? ngx_snprintf(b->last, last - b->last, " down;\n") : ngx_snprintf(b->last, last - b->last, ";\n");
     }
+
+    unlock_peers(primary);
 
     return NGX_OK;
 }
@@ -170,18 +184,14 @@ ngx_dynamic_upstream_handler(ngx_http_request_t *r)
     }
 
     shpool = (ngx_slab_pool_t *) uscf->shm_zone->shm.addr;
-    ngx_shmtx_lock(&shpool->mutex);
     
     rc = ngx_dynamic_upstream_op(r, &op, shpool, uscf);
     if (rc != NGX_OK) {
-        ngx_shmtx_unlock(&shpool->mutex);
         if (op.status == NGX_HTTP_OK) {
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
         return op.status;
     }
-
-    ngx_shmtx_unlock(&shpool->mutex);
 
     size = uscf->shm_zone->shm.size;
 

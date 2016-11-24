@@ -85,3 +85,23 @@ server 127.0.0.1:6004 weight=10 max_fails=1 fail_timeout=10;
     GET /dynamic?upstream=zone_for_backends&server=127.0.0.1:6004&add=&remove=
 --- response_body_like: 400 Bad Request
 --- error_code: 400
+
+=== TEST 5: add backup
+--- http_config
+    upstream backends {
+        zone zone_for_backends 128k;
+        server 127.0.0.1:6001;
+        server 127.0.0.1:6002;
+        server 127.0.0.1:6003;
+    }
+--- config
+    location /dynamic {
+        dynamic_upstream;
+    }
+--- request
+    GET /dynamic?upstream=zone_for_backends&server=127.0.0.1:6004&add=&backup=
+--- response_body
+server 127.0.0.1:6001;
+server 127.0.0.1:6002;
+server 127.0.0.1:6003;
+server 127.0.0.1:6004 backup;
