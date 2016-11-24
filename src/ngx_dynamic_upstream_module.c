@@ -187,7 +187,6 @@ ngx_dynamic_upstream_handler(ngx_http_request_t *r)
     
     rc = ngx_dynamic_upstream_op(r, &op, shpool, uscf);
     if (rc != NGX_OK) {
-        ngx_shmtx_unlock(&shpool->mutex);
         if (op.status == NGX_HTTP_OK) {
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
