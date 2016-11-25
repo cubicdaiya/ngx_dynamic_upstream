@@ -789,6 +789,10 @@ ngx_dynamic_upstream_http_op_update_param(ngx_log_t *log, ngx_dynamic_upstream_o
         target->max_fails = op->max_fails;
     }
 
+    if (op->op_param & NGX_DYNAMIC_UPSTEAM_OP_PARAM_MAX_CONNS) {
+        target->max_conns = op->max_conns;
+    }
+
     if (op->op_param & NGX_DYNAMIC_UPSTEAM_OP_PARAM_FAIL_TIMEOUT) {
         target->fail_timeout = op->fail_timeout;
     }
