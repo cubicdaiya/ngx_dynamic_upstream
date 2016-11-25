@@ -1,10 +1,10 @@
 2016-11-25 Aleksey Konovkin <alkon2000@mail.ru>
 
-<------>* feature: backup support.
+        * feature: backup support.
 
-<------>* feature: stream support.
+        * feature: stream support.
 
-<------>* bugfix: fixed cuncurent access to peers from many nginx workers
+        * bugfix: fixed cuncurent access to peers from many nginx workers
 
 2016-02-11 Tatsuhiko Kubo <cubicdaiya@gmail.com>
 
