@@ -10,7 +10,6 @@ This module also supports stream upstreams manipulation.
 # Requirements
 
 `ngx_dynamic_upstream` requires the `zone` directive in the `upstream` context.
-This directive is available in nginx-1.9.0-plus.
 
 # Status
 
