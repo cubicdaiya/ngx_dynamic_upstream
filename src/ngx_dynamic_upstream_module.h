@@ -5,6 +5,7 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
+#include <ngx_stream.h>
 
 
 #define NGX_DYNAMIC_UPSTEAM_OP_LIST   0
@@ -19,7 +20,8 @@
 #define NGX_DYNAMIC_UPSTEAM_OP_PARAM_FAIL_TIMEOUT 4
 #define NGX_DYNAMIC_UPSTEAM_OP_PARAM_UP           8
 #define NGX_DYNAMIC_UPSTEAM_OP_PARAM_DOWN         16
-
+#define NGX_DYNAMIC_UPSTEAM_OP_PARAM_MAX_CONNS    32
+#define NGX_DYNAMIC_UPSTEAM_OP_PARAM_STREAM       256
 
 typedef struct ngx_dynamic_upstream_op_t {
     ngx_int_t verbose;
@@ -28,6 +30,7 @@ typedef struct ngx_dynamic_upstream_op_t {
     ngx_int_t backup;
     ngx_int_t weight;
     ngx_int_t max_fails;
+    ngx_int_t max_conns;
     ngx_int_t fail_timeout;
     ngx_int_t up;
     ngx_int_t down;
@@ -35,6 +38,14 @@ typedef struct ngx_dynamic_upstream_op_t {
     ngx_str_t server;
     ngx_uint_t status;
 } ngx_dynamic_upstream_op_t;
+
+
+ngx_int_t
+ngx_dynamic_upstream_op(ngx_log_t *log, ngx_dynamic_upstream_op_t *op, ngx_http_upstream_srv_conf_t *uscf);
+
+
+ngx_int_t
+ngx_dynamic_upstream_stream_op(ngx_log_t *log, ngx_dynamic_upstream_op_t *op, ngx_stream_upstream_srv_conf_t *uscf);
 
 
 #endif /* NGX_DYNAMIC_UPSTEAM_H */
