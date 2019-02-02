@@ -113,7 +113,7 @@ $
 ## add
 
 ```bash
-$ curl "http://127.0.0.1:6000/dynamic?upstream=zone_for_backends&add=&server=127.0.0.1:6004"
+$ curl "http://127.0.0.1:6000/dynamic?upstream=zone_for_backends&server=127.0.0.1:6004&add="
 server 127.0.0.1:6001;
 server 127.0.0.1:6002;
 server 127.0.0.1:6003;
@@ -124,7 +124,7 @@ $
 ## remove
 
 ```bash
-$ curl "http://127.0.0.1:6000/dynamic?upstream=zone_for_backends&remove=&server=127.0.0.1:6003"
+$ curl "http://127.0.0.1:6000/dynamic?upstream=zone_for_backends&server=127.0.0.1:6003&remove="
 server 127.0.0.1:6001;
 server 127.0.0.1:6002;
 server 127.0.0.1:6004;
