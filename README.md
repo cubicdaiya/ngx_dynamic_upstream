@@ -1,7 +1,5 @@
 # ngx_dynamic_upstream
 
-[![Build Status](https://drone.io/github.com/cubicdaiya/ngx_dynamic_upstream/status.png)](https://drone.io/github.com/cubicdaiya/ngx_dynamic_upstream/latest)
-
 `ngx_dynamic_upstream` is the module for operating upstreams dynamically with HTTP APIs
 such as [`ngx_http_upstream_conf`](http://nginx.org/en/docs/http/ngx_http_upstream_conf_module.html).
 
