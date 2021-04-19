@@ -230,13 +230,15 @@ static ngx_int_t
 ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op,
                             ngx_slab_pool_t *shpool, ngx_http_upstream_srv_conf_t *uscf)
 {
-    ngx_http_upstream_rr_peer_t   *peer, *last;
+    ngx_http_upstream_rr_peer_t   *peer, *last, *new_peer;
     ngx_http_upstream_rr_peers_t  *peers;
     ngx_url_t                      u;
 
     peers = uscf->peer.data;
+    ngx_http_upstream_rr_peers_wlock(peers);
     for (peer = peers->peer, last = peer; peer; peer = peer->next) {
         if (op->server.len == peer->name.len && ngx_strncmp(op->server.data, peer->name.data, peer->name.len) == 0) {
+            ngx_http_upstream_rr_peers_unlock(peers);
             op->status = NGX_HTTP_BAD_REQUEST;
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                           "server %V already exists in upstream. %s:%d",
@@ -252,6 +254,7 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
 
     u.url.data = ngx_slab_alloc_locked(shpool, op->server.len);
     if (u.url.data == NULL) {
+        ngx_http_upstream_rr_peers_unlock(peers);
         op->status = NGX_HTTP_INTERNAL_SERVER_ERROR;
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "failed to allocate memory from slab %s:%d",
@@ -264,6 +267,7 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
     u.default_port = 80;
 
     if (ngx_parse_url_slab(shpool, &u) != NGX_OK) {
+        ngx_http_upstream_rr_peers_unlock(peers);
         if (u.err) {
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                           "%s in upstream \"%V\"", u.err, &u.url);
@@ -273,8 +277,9 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
         return NGX_ERROR;
     }
 
-    last->next = ngx_slab_calloc_locked(shpool, sizeof(ngx_http_upstream_rr_peer_t));
-    if (last->next == NULL) {
+    new_peer = ngx_slab_calloc_locked(shpool, sizeof(ngx_http_upstream_rr_peer_t));
+    if (new_peer == NULL) {
+        ngx_http_upstream_rr_peers_unlock(peers);
         op->status = NGX_HTTP_INTERNAL_SERVER_ERROR;
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "failed to allocate memory from slab %s:%d",
@@ -283,41 +288,45 @@ ngx_dynamic_upstream_op_add(ngx_http_request_t *r, ngx_dynamic_upstream_op_t *op
         return NGX_ERROR;
     }
 
-    last->next->name     = u.url;
-    last->next->server   = u.url;
-    last->next->sockaddr = u.addrs[0].sockaddr;
-    last->next->socklen  = u.addrs[0].socklen;
+    new_peer->name     = u.url;
+    new_peer->server   = u.url;
+    new_peer->sockaddr = u.addrs[0].sockaddr;
+    new_peer->socklen  = u.addrs[0].socklen;
 
     if (op->op_param & NGX_DYNAMIC_UPSTEAM_OP_PARAM_WEIGHT) {
-        last->next->weight = op->weight;
-        last->next->effective_weight = op->weight;
-        last->next->current_weight = 0;
+        new_peer->weight = op->weight;
+        new_peer->effective_weight = op->weight;
+        new_peer->current_weight = 0;
     } else {
-        last->next->weight = 1;
-        last->next->effective_weight = 1;
-        last->next->current_weight = 0;
+        new_peer->weight = 1;
+        new_peer->effective_weight = 1;
+        new_peer->current_weight = 0;
     }
 
     if (op->op_param & NGX_DYNAMIC_UPSTEAM_OP_PARAM_MAX_FAILS) {
-        last->next->max_fails = op->max_fails;
+        new_peer->max_fails = op->max_fails;
     } else {
-        last->next->max_fails = 1;
+        new_peer->max_fails = 1;
     }
 
     if (op->op_param & NGX_DYNAMIC_UPSTEAM_OP_PARAM_FAIL_TIMEOUT) {
-        last->next->fail_timeout = op->fail_timeout;
+        new_peer->fail_timeout = op->fail_timeout;
     } else {
-        last->next->fail_timeout = 10;
+        new_peer->fail_timeout = 10;
     }
 
     if (op->op_param & NGX_DYNAMIC_UPSTEAM_OP_PARAM_DOWN) {
-        last->next->down = op->down;
+        new_peer->down = op->down;
     }
+
+    last->next = new_peer;
 
     peers->number++;
     peers->total_weight += last->next->weight;
     peers->single = (peers->number == 1);
     peers->weighted = (peers->total_weight != peers->number);
+
+    ngx_http_upstream_rr_peers_unlock(peers);
 
     ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
                   "added server %V", &op->server);
@@ -335,8 +344,10 @@ ngx_dynamic_upstream_op_remove(ngx_http_request_t *r, ngx_dynamic_upstream_op_t 
     ngx_uint_t                     weight;
 
     peers = uscf->peer.data;
+    ngx_http_upstream_rr_peers_wlock(peers);
 
     if (peers->number < 2) {
+        ngx_http_upstream_rr_peers_unlock(peers);
         op->status = NGX_HTTP_BAD_REQUEST;
         return NGX_ERROR;
     }
@@ -354,6 +365,7 @@ ngx_dynamic_upstream_op_remove(ngx_http_request_t *r, ngx_dynamic_upstream_op_t 
 
     /* not found */
     if (target == NULL) {
+        ngx_http_upstream_rr_peers_unlock(peers);
         op->status = NGX_HTTP_BAD_REQUEST;
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "server %V is not found. %s:%d",
@@ -395,6 +407,8 @@ ngx_dynamic_upstream_op_remove(ngx_http_request_t *r, ngx_dynamic_upstream_op_t 
     peers->single = (peers->number == 1);
     peers->weighted = (peers->total_weight != peers->number);
 
+    ngx_http_upstream_rr_peers_unlock(peers);
+
     ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
                   "removed server %V", &op->server);
 
@@ -411,6 +425,8 @@ ngx_dynamic_upstream_op_update_param(ngx_http_request_t *r, ngx_dynamic_upstream
 
     peers = uscf->peer.data;
 
+    ngx_http_upstream_rr_peers_rlock(peers);
+
     target = NULL;
     for (peer = peers->peer; peer ; peer = peer->next) {
         if (op->server.len == peer->name.len && ngx_strncmp(op->server.data, peer->name.data, peer->name.len) == 0) {
@@ -418,6 +434,8 @@ ngx_dynamic_upstream_op_update_param(ngx_http_request_t *r, ngx_dynamic_upstream
             break;
         }
     }
+
+    ngx_http_upstream_rr_peers_unlock(peers);
 
     if (target == NULL) {
         op->status = NGX_HTTP_BAD_REQUEST;
@@ -428,6 +446,8 @@ ngx_dynamic_upstream_op_update_param(ngx_http_request_t *r, ngx_dynamic_upstream
                       __LINE__);
         return NGX_ERROR;
     }
+    
+    ngx_http_upstream_rr_peer_lock(peers, target);
 
     if (op->op_param & NGX_DYNAMIC_UPSTEAM_OP_PARAM_WEIGHT) {
         target->weight = op->weight;
@@ -454,6 +474,8 @@ ngx_dynamic_upstream_op_update_param(ngx_http_request_t *r, ngx_dynamic_upstream
         ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
                       "upped server %V", &op->server);
     }
+
+    ngx_http_upstream_rr_peer_unlock(peers, target);
 
     return NGX_OK;
 }
